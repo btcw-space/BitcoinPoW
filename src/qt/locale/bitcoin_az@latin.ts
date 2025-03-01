@@ -285,43 +285,43 @@ Daxil olma, yalnız 'qanuni' tipli ünvanlar ilə mümkündür.</translation>
     <message numerus="yes">
         <source>%n second(s)</source>
         <translation type="unfinished">
-            <numerusform>%n second(s)</numerusform>
-            <numerusform>%n second(s)</numerusform>
+            <numerusform />
+            <numerusform />
         </translation>
     </message>
     <message numerus="yes">
         <source>%n minute(s)</source>
         <translation type="unfinished">
-            <numerusform>%n minute(s)</numerusform>
-            <numerusform>%n minute(s)</numerusform>
+            <numerusform />
+            <numerusform />
         </translation>
     </message>
     <message numerus="yes">
         <source>%n hour(s)</source>
         <translation type="unfinished">
-            <numerusform>%n hour(s)</numerusform>
-            <numerusform>%n hour(s)</numerusform>
+            <numerusform />
+            <numerusform />
         </translation>
     </message>
     <message numerus="yes">
         <source>%n day(s)</source>
         <translation type="unfinished">
-            <numerusform>%n day(s)</numerusform>
-            <numerusform>%n day(s)</numerusform>
+            <numerusform />
+            <numerusform />
         </translation>
     </message>
     <message numerus="yes">
         <source>%n week(s)</source>
         <translation type="unfinished">
-            <numerusform>%n week(s)</numerusform>
-            <numerusform>%n week(s)</numerusform>
+            <numerusform />
+            <numerusform />
         </translation>
     </message>
     <message numerus="yes">
         <source>%n year(s)</source>
         <translation type="unfinished">
-            <numerusform>%n year(s)</numerusform>
-            <numerusform>%n year(s)</numerusform>
+            <numerusform />
+            <numerusform />
         </translation>
     </message>
     </context>
@@ -1140,30 +1140,30 @@ Daxil olma, yalnız 'qanuni' tipli ünvanlar ilə mümkündür.</translation>
     <message numerus="yes">
         <source>%n GB of space available</source>
         <translation type="unfinished">
-            <numerusform>%n GB of space available</numerusform>
-            <numerusform>%n GB of space available</numerusform>
+            <numerusform />
+            <numerusform />
         </translation>
     </message>
     <message numerus="yes">
         <source>(of %n GB needed)</source>
         <translation type="unfinished">
-            <numerusform>(of %n GB needed)</numerusform>
-            <numerusform>(of %n GB needed)</numerusform>
+            <numerusform />
+            <numerusform />
         </translation>
     </message>
     <message numerus="yes">
         <source>(%n GB needed for full chain)</source>
         <translation type="unfinished">
-            <numerusform>(%n GB needed for full chain)</numerusform>
-            <numerusform>(%n GB needed for full chain)</numerusform>
+            <numerusform />
+            <numerusform />
         </translation>
     </message>
     <message numerus="yes">
         <source>(sufficient to restore backups %n day(s) old)</source>
         <extracomment>Explanatory text on the capability of the current prune target.</extracomment>
         <translation type="unfinished">
-            <numerusform>(sufficient to restore backups %n day(s) old)</numerusform>
-            <numerusform>(sufficient to restore backups %n day(s) old)</numerusform>
+            <numerusform />
+            <numerusform />
         </translation>
     </message>
     <message>
@@ -1461,8 +1461,8 @@ Daxil olma, yalnız 'qanuni' tipli ünvanlar ilə mümkündür.</translation>
     <message numerus="yes">
         <source>Estimated to begin confirmation within %n block(s).</source>
         <translation type="unfinished">
-            <numerusform>Estimated to begin confirmation within %n block(s).</numerusform>
-            <numerusform>Estimated to begin confirmation within %n block(s).</numerusform>
+            <numerusform />
+            <numerusform />
         </translation>
     </message>
     <message>
@@ -1483,8 +1483,8 @@ Daxil olma, yalnız 'qanuni' tipli ünvanlar ilə mümkündür.</translation>
     <message numerus="yes">
         <source>matures in %n more block(s)</source>
         <translation type="unfinished">
-            <numerusform>matures in %n more block(s)</numerusform>
-            <numerusform>matures in %n more block(s)</numerusform>
+            <numerusform />
+            <numerusform />
         </translation>
     </message>
     <message>

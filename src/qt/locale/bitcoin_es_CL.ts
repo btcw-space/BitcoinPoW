@@ -6,12 +6,16 @@
         <translation type="unfinished">Click derecho para editar la dirección o etiqueta</translation>
     </message>
     <message>
+        <source>Create a new address</source>
+        <translation type="unfinished">Crear una nueva dirección</translation>
+    </message>
+    <message>
         <source>&amp;New</source>
         <translation type="unfinished">&amp;Nuevo</translation>
     </message>
     <message>
         <source>Copy the currently selected address to the system clipboard</source>
-        <translation type="unfinished">Copiar la dirección seleccionada actualmente al portapapeles del sistema</translation>
+        <translation type="unfinished">Copiar la dirección actualmente seleccionada al sistema de portapapeles</translation>
     </message>
     <message>
         <source>&amp;Copy</source>

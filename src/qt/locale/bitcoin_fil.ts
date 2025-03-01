@@ -348,7 +348,7 @@ Signing is only possible with addresses of the type 'legacy'.</source>
     </message>
     <message>
         <source>&amp;Minimize</source>
-        <translation type="unfinished">&amp;Paliitin</translation>
+        <translation type="unfinished">&amp;Pagliitin</translation>
     </message>
     <message>
         <source>Wallet:</source>
@@ -480,7 +480,7 @@ Signing is only possible with addresses of the type 'legacy'.</source>
     </message>
     <message>
         <source>Open a wallet</source>
-        <translation type="unfinished">Magbukas ng wallet</translation>
+        <translation type="unfinished">Buksan ang anumang walet</translation>
     </message>
     <message>
         <source>Close wallet</source>
@@ -488,7 +488,7 @@ Signing is only possible with addresses of the type 'legacy'.</source>
     </message>
     <message>
         <source>Close all wallets</source>
-        <translation type="unfinished">Isara ang lahat ng wallets</translation>
+        <translation type="unfinished">Isarado ang lahat ng wallets</translation>
     </message>
     <message>
         <source>Show the %1 help message to get a list with possible Bitcoin command-line options</source>
@@ -496,7 +496,7 @@ Signing is only possible with addresses of the type 'legacy'.</source>
     </message>
     <message>
         <source>default wallet</source>
-        <translation type="unfinished">wallet na default</translation>
+        <translation type="unfinished">walet na default</translation>
     </message>
     <message>
         <source>No wallets available</source>

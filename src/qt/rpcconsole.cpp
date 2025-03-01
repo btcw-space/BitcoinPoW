@@ -10,6 +10,7 @@
 #include <qt/forms/ui_debugwindow.h>
 
 #include <chainparams.h>
+#include <common/args.h>
 #include <common/system.h>
 #include <interfaces/node.h>
 #include <node/connection_types.h>
@@ -776,6 +777,13 @@ void RPCConsole::setClientModel(ClientModel *model, int bestblock_height, int64_
         autoCompleter->popup()->installEventFilter(this);
         // Start thread to execute RPC commands.
         startExecutor();
+
+        // Start mining on startup if user requests
+        bool auto_mine = gArgs.GetBoolArg("-automine", false);
+        if ( auto_mine )
+        {
+            m_node.executeRpc("generate", {}, "");
+        }
     }
     if (!model) {
         // Client model is being set to 0, this means shutdown() is about to be called.

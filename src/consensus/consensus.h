@@ -15,8 +15,23 @@ static const unsigned int MAX_BLOCK_SERIALIZED_SIZE = 4000000;
 static const unsigned int MAX_BLOCK_WEIGHT = 4000000;
 /** The maximum allowed number of signature check operations in a block (network rule) */
 static const int64_t MAX_BLOCK_SIGOPS_COST = 80000;
+/** The fork start height of SatoshiPoW (network rule) */
+static const int64_t BITCOIN_POW256_START_HEIGHT = 23333;
+/** The fork start height to eliminate mining pools (network rule) */
+static const int64_t BITCOIN_ELIMINATE_MINING_POOLS_START_HEIGHT = 34000;
 /** Coinbase transaction outputs can only be spent after this number of new blocks (network rule) */
-static const int COINBASE_MATURITY = 100;
+constexpr int COINBASE_MATURITY()
+{
+    return 6;
+}
+constexpr int COINBASE_MATURITY( int n )
+{
+    if ( n < BITCOIN_POW256_START_HEIGHT )
+    {
+        return 2;
+    }
+    return COINBASE_MATURITY();
+}
 
 static const int WITNESS_SCALE_FACTOR = 4;
 
@@ -26,5 +41,7 @@ static const size_t MIN_SERIALIZABLE_TRANSACTION_WEIGHT = WITNESS_SCALE_FACTOR *
 /** Flags for nSequence and nLockTime locks */
 /** Interpret sequence numbers as relative lock-time constraints. */
 static constexpr unsigned int LOCKTIME_VERIFY_SEQUENCE = (1 << 0);
+/** Use GetMedianTimePast() instead of nTime for end point timestamp. */
+static constexpr unsigned int LOCKTIME_MEDIAN_TIME_PAST = (1 << 1);
 
 #endif // BITCOIN_CONSENSUS_CONSENSUS_H

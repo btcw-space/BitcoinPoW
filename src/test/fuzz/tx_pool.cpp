@@ -41,10 +41,10 @@ void initialize_tx_pool()
     static const auto testing_setup = MakeNoLogFileContext<const TestingSetup>();
     g_setup = testing_setup.get();
 
-    for (int i = 0; i < 2 * COINBASE_MATURITY; ++i) {
+    for (int i = 0; i < 2 * COINBASE_MATURITY(); ++i) {
         COutPoint prevout{MineBlock(g_setup->m_node, P2WSH_OP_TRUE)};
         // Remember the txids to avoid expensive disk access later on
-        auto& outpoints = i < COINBASE_MATURITY ?
+        auto& outpoints = i < COINBASE_MATURITY() ?
                               g_outpoints_coinbase_init_mature :
                               g_outpoints_coinbase_init_immature;
         outpoints.push_back(prevout);
@@ -149,7 +149,7 @@ FUZZ_TARGET(tx_pool_standard, .init = initialize_tx_pool)
     outpoints_rbf = outpoints_supply;
 
     // The sum of the values of all spendable outpoints
-    constexpr CAmount SUPPLY_TOTAL{COINBASE_MATURITY * 50 * COIN};
+    constexpr CAmount SUPPLY_TOTAL{COINBASE_MATURITY() * 50 * COIN};
 
     SetMempoolConstraints(*node.args, fuzzed_data_provider);
     CTxMemPool tx_pool_{MakeMempool(fuzzed_data_provider, node)};

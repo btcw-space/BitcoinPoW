@@ -81,7 +81,7 @@ To build without GUI pass `--without-gui`.
 
 To build with Qt 5 you need the following:
 
-    sudo apt-get install qtbase5-dev qttools5-dev qttools5-dev-tools
+    sudo apt-get install libqt5gui5 libqt5core5a libqt5dbus5 qttools5-dev qttools5-dev-tools
 
 Additionally, to support Wayland protocol for modern desktop environments:
 
@@ -203,11 +203,24 @@ Setup and Build Example: Arch Linux
 This example lists the steps necessary to setup and build a command line only distribution of the latest changes on Arch Linux:
 
     pacman --sync --needed autoconf automake boost gcc git libevent libtool make pkgconf python sqlite
-    git clone https://github.com/bitcoin/bitcoin.git
-    cd bitcoin/
+    git clone https://github.com/bitcoin-pow/BitcoinPoW.git
+    cd BitcoinPoW/
     ./autogen.sh
     ./configure
     make check
     ./src/bitcoind
+
+
+Portable Linux build
+-------------------
+    git clone https://github.com/bitcoin-pow/BitcoinPoW.git
+    cd BitcoinPoW
+    cd depends
+    make
+    cd ..
+    export CONFIG_SITE=`pwd`/depends/x86_64-pc-linux-gnu/share/config.site
+    ./autogen.sh
+    ./configure --enable-glibc-back-compat --prefix=`pwd`/depends/x86_64-pc-linux-gnu LDFLAGS="-static-libstdc++"
+    make
 
 If you intend to work with legacy Berkeley DB wallets, see [Berkeley DB](#berkeley-db) section.

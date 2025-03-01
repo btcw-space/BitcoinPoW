@@ -1,13 +1,14 @@
 AC_PREREQ([2.69])
 define(_CLIENT_VERSION_MAJOR, 26)
-define(_CLIENT_VERSION_MINOR, 2)
-define(_CLIENT_VERSION_BUILD, 0)
+define(_CLIENT_VERSION_MINOR, 4)
+define(_CLIENT_VERSION_REVISION, 7)
+define(_CLIENT_VERSION_BUILD, 7)
 define(_CLIENT_VERSION_RC, 0)
 define(_CLIENT_VERSION_IS_RELEASE, true)
 define(_COPYRIGHT_YEAR, 2024)
 define(_COPYRIGHT_HOLDERS,[The %s developers])
-define(_COPYRIGHT_HOLDERS_SUBSTITUTION,[[Bitcoin Core]])
-AC_INIT([Bitcoin Core],m4_join([.], _CLIENT_VERSION_MAJOR, _CLIENT_VERSION_MINOR, _CLIENT_VERSION_BUILD)m4_if(_CLIENT_VERSION_RC, [0], [], [rc]_CLIENT_VERSION_RC),[https://github.com/bitcoin/bitcoin/issues],[bitcoin],[https://bitcoincore.org/])
+define(_COPYRIGHT_HOLDERS_SUBSTITUTION,[[Bitcoin PoW Core]])
+AC_INIT([Bitcoin PoW Core],m4_join([.], _CLIENT_VERSION_MAJOR, _CLIENT_VERSION_MINOR, _CLIENT_VERSION_REVISION, m4_if(_CLIENT_VERSION_BUILD, [0], [], _CLIENT_VERSION_BUILD))m4_if(_CLIENT_VERSION_RC, [0], [], [rc]_CLIENT_VERSION_RC),[https://github.com/bitcoin-pow/BitcoinPoW/issues],[bitcoin],[https://www.bitcoin-pow.org/])
 AC_CONFIG_SRCDIR([src/validation.cpp])
 AC_CONFIG_HEADERS([src/config/bitcoin-config.h])
 AC_CONFIG_AUX_DIR([build-aux])
@@ -36,7 +37,7 @@ BITCOIN_CLI_NAME=bitcoin-cli
 BITCOIN_TX_NAME=bitcoin-tx
 BITCOIN_UTIL_NAME=bitcoin-util
 BITCOIN_CHAINSTATE_NAME=bitcoin-chainstate
-BITCOIN_WALLET_TOOL_NAME=bitcoin-wallet
+#BITCOIN_WALLET_TOOL_NAME=bitcoin-wallet
 dnl Multi Process
 BITCOIN_MP_NODE_NAME=bitcoin-node
 BITCOIN_MP_GUI_NAME=bitcoin-gui
@@ -755,7 +756,7 @@ case $host in
          dnl option to system-ify all /usr/local/include paths without adding it to the list
          dnl of search paths in case it's not already there.
          if test "$suppress_external_warnings" != "no"; then
-           AX_CHECK_PREPROC_FLAG([-Xclang -internal-isystem -Xclang /usr/local/include/], [CORE_CPPFLAGS="$CORE_CPPFLAGS -Xclang -internal-isystem -Xclang /usr/local/include/"], [], [$CXXFLAG_WERROR])
+           AX_CHECK_PREPROC_FLAG([-Xclang -internal-isystem/usr/local/include], [CORE_CPPFLAGS="$CORE_CPPFLAGS -Xclang -internal-isystem/usr/local/include"], [], [$CXXFLAG_WERROR])
          fi
 
          if test "$use_bdb" != "no" && $BREW list --versions berkeley-db@4 >/dev/null && test "$BDB_CFLAGS" = "" && test "$BDB_LIBS" = ""; then
@@ -1665,7 +1666,7 @@ AM_CONDITIONAL([BUILD_BITCOIN_TX], [test $build_bitcoin_tx = "yes"])
 AC_MSG_RESULT($build_bitcoin_tx)
 
 AC_MSG_CHECKING([whether to build bitcoin-wallet])
-AM_CONDITIONAL([BUILD_BITCOIN_WALLET], [test $build_bitcoin_wallet = "yes"])
+AM_CONDITIONAL([BUILD_BITCOIN_WALLET], [test $build_bitcoin_wallet = "no"])
 AC_MSG_RESULT($build_bitcoin_wallet)
 
 AC_MSG_CHECKING([whether to build bitcoin-util])
@@ -1886,7 +1887,7 @@ AC_SUBST(BITCOIN_CLI_NAME)
 AC_SUBST(BITCOIN_TX_NAME)
 AC_SUBST(BITCOIN_UTIL_NAME)
 AC_SUBST(BITCOIN_CHAINSTATE_NAME)
-AC_SUBST(BITCOIN_WALLET_TOOL_NAME)
+#AC_SUBST(BITCOIN_WALLET_TOOL_NAME)
 AC_SUBST(BITCOIN_MP_NODE_NAME)
 AC_SUBST(BITCOIN_MP_GUI_NAME)
 

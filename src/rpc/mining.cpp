@@ -5,6 +5,7 @@
 
 #include <chain.h>
 #include <chainparams.h>
+#include <common/args.h>
 #include <common/system.h>
 #include <consensus/amount.h>
 #include <consensus/consensus.h>
@@ -37,7 +38,9 @@
 #include <validation.h>
 #include <validationinterface.h>
 #include <warnings.h>
-
+#include <wallet/wallet.h>
+#include <wallet/rpc/util.h>
+#include <node/miner.h>
 #include <memory>
 #include <stdint.h>
 
@@ -49,22 +52,13 @@ using node::UpdateTime;
 
 /**
  * Return average network hashes per second based on the last 'lookup' blocks,
- * or from the last difficulty change if 'lookup' is -1.
- * If 'height' is -1, compute the estimate from current chain tip.
- * If 'height' is a valid block height, compute the estimate at the time when a given block was found.
+ * or from the last difficulty change if 'lookup' is nonpositive.
+ * If 'height' is nonnegative, compute the estimate at the time when a given block was found.
  */
 static UniValue GetNetworkHashPS(int lookup, int height, const CChain& active_chain) {
-    if (lookup < -1 || lookup == 0) {
-        throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid nblocks. Must be a positive number or -1.");
-    }
-
-    if (height < -1 || height > active_chain.Height()) {
-        throw JSONRPCError(RPC_INVALID_PARAMETER, "Block does not exist at specified height");
-    }
-
     const CBlockIndex* pb = active_chain.Tip();
 
-    if (height >= 0) {
+    if (height >= 0 && height < active_chain.Height()) {
         pb = active_chain[height];
     }
 
@@ -72,7 +66,7 @@ static UniValue GetNetworkHashPS(int lookup, int height, const CChain& active_ch
         return 0;
 
     // If lookup is -1, then use blocks since last difficulty change.
-    if (lookup == -1)
+    if (lookup <= 0)
         lookup = pb->nHeight % Params().GetConsensus().DifficultyAdjustmentInterval() + 1;
 
     // If lookup is larger than chain, then set it to chain length.
@@ -96,7 +90,7 @@ static UniValue GetNetworkHashPS(int lookup, int height, const CChain& active_ch
     arith_uint256 workDiff = pb->nChainWork - pb0->nChainWork;
     int64_t timeDiff = maxTime - minTime;
 
-    return workDiff.getdouble() / timeDiff;
+    return workDiff.getdouble() / timeDiff / SIG_DIFF_ADJ;
 }
 
 static RPCHelpMan getnetworkhashps()
@@ -106,7 +100,7 @@ static RPCHelpMan getnetworkhashps()
                 "Pass in [blocks] to override # of blocks, -1 specifies since last difficulty change.\n"
                 "Pass in [height] to estimate the network speed at the time when a certain block was found.\n",
                 {
-                    {"nblocks", RPCArg::Type::NUM, RPCArg::Default{120}, "The number of previous blocks to calculate estimate from, or -1 for blocks since last difficulty change."},
+                    {"nblocks", RPCArg::Type::NUM, RPCArg::Default{120}, "The number of blocks, or -1 for blocks since last difficulty change."},
                     {"height", RPCArg::Type::NUM, RPCArg::Default{-1}, "To estimate at the time of the given height."},
                 },
                 RPCResult{
@@ -244,11 +238,69 @@ static RPCHelpMan generatetodescriptor()
     };
 }
 
+extern wallet::CWallet *gp_wallet;
 static RPCHelpMan generate()
 {
-    return RPCHelpMan{"generate", "has been replaced by the -generate cli option. Refer to -help for more information.", {}, {}, RPCExamples{""}, [&](const RPCHelpMan& self, const JSONRPCRequest& request) -> UniValue {
-        throw JSONRPCError(RPC_METHOD_NOT_FOUND, self.ToString());
-    }};
+    return RPCHelpMan{"generate",
+        "Mine to a any address",
+         {
+         },
+         RPCResult{"Status", RPCResult::Type::NONE, "", ""},
+         RPCExamples{
+            "\nGenerate blocks to any address. This is the new way to mine BTCW.\nMining is single threaded and uses only one wallet.\nMining can be stopped in the following ways:\n-Use the lightning icon in the GUI.\n-Close the wallet.\n-Close the node.\n\nTo start mining again, use this rpc command.\n"
+            + HelpExampleCli("generate", "")
+                },
+        [&](const RPCHelpMan& self, const JSONRPCRequest& request) -> UniValue
+{
+    static NodeContext& node = EnsureAnyNodeContext(request.context);
+    static const CTxMemPool& mempool = EnsureMemPool(node);
+    static ChainstateManager& chainman = EnsureChainman(node);
+    static CConnman& connman = EnsureConnman(node);
+    static std::atomic<bool> invoked{false};
+
+    UniValue ret(UniValue::VARR);
+    
+    if (gp_wallet)
+    {
+        if ( invoked.load() )
+        {
+            ret.push_back("Mining already in progress. Use lightning icon on GUI to stop mining or shutdown node to stop mining.");
+            return ret;
+        }
+
+        gp_wallet->BlockUntilSyncedToCurrentChain();
+        ret.push_back("Mining started. Use lightning icon on GUI to stop mining or shutdown node to stop mining.");
+
+        invoked.store(true);
+        std::thread mining_thread([=]() {
+                // If exception is thrown, try to mine again.
+                while (true)
+                {
+                    try
+                    {
+                        node::ThreadStakeMiner(*gp_wallet, connman, chainman, mempool);
+                        invoked.store(false);
+                        break; // completed naturally, break out
+                    }
+                    catch(...)
+                    {
+                        // try again in loop
+                    }
+                }
+            }
+        );
+
+        mining_thread.detach();
+
+    }
+    else
+    {
+        ret.push_back("Mining not started - wallet not loaded.");
+    }
+
+    return ret;
+},
+    };
 }
 
 static RPCHelpMan generatetoaddress()
@@ -276,7 +328,7 @@ static RPCHelpMan generatetoaddress()
     const int num_blocks{request.params[0].getInt<int>()};
     const uint64_t max_tries{request.params[2].isNull() ? DEFAULT_MAX_TRIES : request.params[2].getInt<int>()};
 
-    CTxDestination destination = DecodeDestination(request.params[1].get_str());
+CTxDestination destination = DecodeDestination(request.params[1].get_str());
     if (!IsValidDestination(destination)) {
         throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Error: Invalid address");
     }
@@ -421,6 +473,9 @@ static RPCHelpMan getmininginfo()
                         {RPCResult::Type::NUM, "currentblocktx", /*optional=*/true, "The number of block transactions of the last assembled block (only present if a block was ever assembled)"},
                         {RPCResult::Type::NUM, "difficulty", "The current difficulty"},
                         {RPCResult::Type::NUM, "networkhashps", "The network hashes per second"},
+                        {RPCResult::Type::NUM, "localhashps", "The local miner's hashes per second"},
+                        {RPCResult::Type::NUM, "daystofind", "The estimated days for miner to mine a block."},
+                        {RPCResult::Type::NUM, "cpuloadingpercent", "The CPU loading percent"},
                         {RPCResult::Type::NUM, "pooledtx", "The size of the mempool"},
                         {RPCResult::Type::STR, "chain", "current network name (main, test, signet, regtest)"},
                         {RPCResult::Type::STR, "warnings", "any network and blockchain warnings"},
@@ -442,7 +497,44 @@ static RPCHelpMan getmininginfo()
     if (BlockAssembler::m_last_block_weight) obj.pushKV("currentblockweight", *BlockAssembler::m_last_block_weight);
     if (BlockAssembler::m_last_block_num_txs) obj.pushKV("currentblocktx", *BlockAssembler::m_last_block_num_txs);
     obj.pushKV("difficulty",       (double)GetDifficulty(active_chain.Tip()));
-    obj.pushKV("networkhashps",    getnetworkhashps().HandleRequest(request));
+    obj.pushKV("network-hashps",    getnetworkhashps().HandleRequest(request));
+    obj.pushKV("local-stage1-utxos",      wallet::getUtxosStage1());
+    obj.pushKV("local-stage1-hashps",      wallet::getHashesPerSecond1());
+    obj.pushKV("local-stage2-hashps",      wallet::getHashesPerSecond2());
+
+    double net = getnetworkhashps().HandleRequest(request).get_real();
+
+    double local1 = wallet::getHashesPerSecond1();
+    double local2 = wallet::getHashesPerSecond2();
+    
+    bool mining_active = wallet::IsMiningActive();
+
+    if ( 0 == local2 )
+    {
+        obj.pushKV("daystofind", "never"); // Can only find a block if in stage2
+    }    
+    else
+    {
+        double days = net/(144*local2);
+        obj.pushKV("daystofind", days);  
+    }
+
+    if ( false == mining_active )
+    {
+        // Mining turned off
+        obj.pushKV("cpuloadingpercent", (double)0);
+    }
+    else if ( local2 > 0 )
+    {
+        // Stage2 is always 100% loading on each active core
+        obj.pushKV("cpuloadingpercent", (double)100);        
+    }
+    else
+    {
+        // Stage1 requires utxos to create a loading
+        obj.pushKV("cpuloadingpercent", wallet::getCpuLoading());
+    }    
+    
     obj.pushKV("pooledtx",         (uint64_t)mempool.size());
     obj.pushKV("chain", chainman.GetParams().GetChainTypeString());
     obj.pushKV("warnings",         GetWarnings(false).original);
@@ -452,7 +544,7 @@ static RPCHelpMan getmininginfo()
 }
 
 
-// NOTE: Unlike wallet RPC (which use BTC values), mining RPCs follow GBT (BIP 22) in using satoshi amounts
+// NOTE: Unlike wallet RPC (which use BTCW values), mining RPCs follow GBT (BIP 22) in using satoshi amounts
 static RPCHelpMan prioritisetransaction()
 {
     return RPCHelpMan{"prioritisetransaction",
@@ -800,7 +892,8 @@ static RPCHelpMan getblocktemplate()
 
         // Create new block
         CScript scriptDummy = CScript() << OP_TRUE;
-        pblocktemplate = BlockAssembler{active_chainstate, &mempool}.CreateNewBlock(scriptDummy);
+        int64_t nTotalFees;
+        pblocktemplate = BlockAssembler{active_chainstate, &mempool}.CreateNewBlock(scriptDummy, true, &nTotalFees, 0);
         if (!pblocktemplate)
             throw JSONRPCError(RPC_OUT_OF_MEMORY, "Out of memory");
 
@@ -1102,7 +1195,7 @@ void RegisterMiningRPCCommands(CRPCTable& t)
         {"hidden", &generatetoaddress},
         {"hidden", &generatetodescriptor},
         {"hidden", &generateblock},
-        {"hidden", &generate},
+        {"mining", &generate},
     };
     for (const auto& c : commands) {
         t.appendCommand(c.name, &c);

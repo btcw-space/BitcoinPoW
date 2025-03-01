@@ -245,7 +245,8 @@ public:
             // put the memory block into the linked list. We can placement construct the FreeList
             // into the memory since we can be sure the alignment is correct.
             PlacementAddToList(p, m_free_lists[num_alignments]);
-        } else {
+        } else 
+        {
             // Can't use the pool => forward deallocation to ::operator delete().
             ::operator delete (p, std::align_val_t{alignment});
         }

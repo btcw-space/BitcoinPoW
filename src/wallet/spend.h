@@ -65,7 +65,7 @@ private:
 
 struct CoinFilterParams {
     // Outputs below the minimum amount will not get selected
-    CAmount min_amount{1};
+    CAmount min_amount{MAX_MINING_UTXO_MONEY};
     // Outputs above the maximum amount will not get selected
     CAmount max_amount{MAX_MONEY};
     // Return outputs until the minimum sum amount is covered

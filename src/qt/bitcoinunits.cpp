@@ -21,9 +21,9 @@ BitcoinUnits::BitcoinUnits(QObject *parent):
 QList<BitcoinUnit> BitcoinUnits::availableUnits()
 {
     QList<BitcoinUnit> unitlist;
-    unitlist.append(Unit::BTC);
-    unitlist.append(Unit::mBTC);
-    unitlist.append(Unit::uBTC);
+    unitlist.append(Unit::BTCW);
+    unitlist.append(Unit::mBTCW);
+    unitlist.append(Unit::uBTCW);
     unitlist.append(Unit::SAT);
     return unitlist;
 }
@@ -31,9 +31,9 @@ QList<BitcoinUnit> BitcoinUnits::availableUnits()
 QString BitcoinUnits::longName(Unit unit)
 {
     switch (unit) {
-    case Unit::BTC: return QString("BTC");
-    case Unit::mBTC: return QString("mBTC");
-    case Unit::uBTC: return QString::fromUtf8("µBTC (bits)");
+    case Unit::BTCW: return QString("BTCW");
+    case Unit::mBTCW: return QString("mBTCW");
+    case Unit::uBTCW: return QString::fromUtf8("µBTCW (bits)");
     case Unit::SAT: return QString("Satoshi (sat)");
     } // no default case, so the compiler can warn about missing cases
     assert(false);
@@ -42,9 +42,9 @@ QString BitcoinUnits::longName(Unit unit)
 QString BitcoinUnits::shortName(Unit unit)
 {
     switch (unit) {
-    case Unit::BTC: return longName(unit);
-    case Unit::mBTC: return longName(unit);
-    case Unit::uBTC: return QString("bits");
+    case Unit::BTCW: return longName(unit);
+    case Unit::mBTCW: return longName(unit);
+    case Unit::uBTCW: return QString("bits");
     case Unit::SAT: return QString("sat");
     } // no default case, so the compiler can warn about missing cases
     assert(false);
@@ -53,9 +53,9 @@ QString BitcoinUnits::shortName(Unit unit)
 QString BitcoinUnits::description(Unit unit)
 {
     switch (unit) {
-    case Unit::BTC: return QString("Bitcoins");
-    case Unit::mBTC: return QString("Milli-Bitcoins (1 / 1" THIN_SP_UTF8 "000)");
-    case Unit::uBTC: return QString("Micro-Bitcoins (bits) (1 / 1" THIN_SP_UTF8 "000" THIN_SP_UTF8 "000)");
+    case Unit::BTCW: return QString("Bitcoins");
+    case Unit::mBTCW: return QString("Milli-Bitcoins (1 / 1" THIN_SP_UTF8 "000)");
+    case Unit::uBTCW: return QString("Micro-Bitcoins (bits) (1 / 1" THIN_SP_UTF8 "000" THIN_SP_UTF8 "000)");
     case Unit::SAT: return QString("Satoshi (sat) (1 / 100" THIN_SP_UTF8 "000" THIN_SP_UTF8 "000)");
     } // no default case, so the compiler can warn about missing cases
     assert(false);
@@ -64,9 +64,9 @@ QString BitcoinUnits::description(Unit unit)
 qint64 BitcoinUnits::factor(Unit unit)
 {
     switch (unit) {
-    case Unit::BTC: return 100'000'000;
-    case Unit::mBTC: return 100'000;
-    case Unit::uBTC: return 100;
+    case Unit::BTCW: return 100'000'000;
+    case Unit::mBTCW: return 100'000;
+    case Unit::uBTCW: return 100;
     case Unit::SAT: return 1;
     } // no default case, so the compiler can warn about missing cases
     assert(false);
@@ -75,9 +75,9 @@ qint64 BitcoinUnits::factor(Unit unit)
 int BitcoinUnits::decimals(Unit unit)
 {
     switch (unit) {
-    case Unit::BTC: return 8;
-    case Unit::mBTC: return 5;
-    case Unit::uBTC: return 2;
+    case Unit::BTCW: return 8;
+    case Unit::mBTCW: return 5;
+    case Unit::uBTCW: return 2;
     case Unit::SAT: return 0;
     } // no default case, so the compiler can warn about missing cases
     assert(false);
@@ -232,9 +232,9 @@ namespace {
 qint8 ToQint8(BitcoinUnit unit)
 {
     switch (unit) {
-    case BitcoinUnit::BTC: return 0;
-    case BitcoinUnit::mBTC: return 1;
-    case BitcoinUnit::uBTC: return 2;
+    case BitcoinUnit::BTCW: return 0;
+    case BitcoinUnit::mBTCW: return 1;
+    case BitcoinUnit::uBTCW: return 2;
     case BitcoinUnit::SAT: return 3;
     } // no default case, so the compiler can warn about missing cases
     assert(false);
@@ -243,9 +243,9 @@ qint8 ToQint8(BitcoinUnit unit)
 BitcoinUnit FromQint8(qint8 num)
 {
     switch (num) {
-    case 0: return BitcoinUnit::BTC;
-    case 1: return BitcoinUnit::mBTC;
-    case 2: return BitcoinUnit::uBTC;
+    case 0: return BitcoinUnit::BTCW;
+    case 1: return BitcoinUnit::mBTCW;
+    case 2: return BitcoinUnit::uBTCW;
     case 3: return BitcoinUnit::SAT;
     }
     assert(false);

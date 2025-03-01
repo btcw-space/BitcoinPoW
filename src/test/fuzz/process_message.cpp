@@ -52,7 +52,7 @@ void initialize_process_message()
             /*chain_type=*/ChainType::REGTEST,
             /*extra_args=*/{"-txreconciliation"});
     g_setup = testing_setup.get();
-    for (int i = 0; i < 2 * COINBASE_MATURITY; i++) {
+    for (int i = 0; i < 2 * COINBASE_MATURITY(); i++) {
         MineBlock(g_setup->m_node, CScript() << OP_TRUE);
     }
     SyncWithValidationInterfaceQueue();

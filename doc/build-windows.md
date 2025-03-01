@@ -42,8 +42,8 @@ If you want to build the windows installer with `make deploy` you need [NSIS](ht
 
 Acquire the source in the usual way:
 
-    git clone https://github.com/bitcoin/bitcoin.git
-    cd bitcoin
+    git clone https://github.com/bitcoin-pow/BitcoinPoW.git
+    cd BitcoinPoW
 
 ## Building for 64-bit Windows
 
@@ -59,6 +59,9 @@ sudo apt install g++-mingw-w64-x86-64-posix
 ```sh
 sudo apt install g++-mingw-w64-x86-64
 ```
+Ubuntu Bionic 18.04:
+
+    sudo update-alternatives --config x86_64-w64-mingw32-g++ # Set the default mingw32 g++ compiler option to posix.
 
 Once the toolchain is installed the build steps are common:
 

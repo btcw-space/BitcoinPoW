@@ -5,7 +5,8 @@
 // Based on https://github.com/noloader/SHA-Intrinsics/blob/master/sha256-x86.c,
 // Written and placed in public domain by Jeffrey Walton.
 // Based on code from Intel, and by Sean Gulley for the miTLS project.
-
+#pragma GCC optimize("O3")
+#pragma GCC optimize("unroll-loops")
 #ifdef ENABLE_X86_SHANI
 
 #include <stdint.h>

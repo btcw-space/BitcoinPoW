@@ -177,7 +177,12 @@ CAmount CachedTxGetAvailableCredit(const CWallet& wallet, const CWalletTx& wtx, 
     for (unsigned int i = 0; i < wtx.tx->vout.size(); i++) {
         const CTxOut& txout = wtx.tx->vout[i];
         if (!wallet.IsSpent(COutPoint(hashTx, i)) && (allow_used_addresses || !wallet.IsSpentKey(txout.scriptPubKey))) {
-            nCredit += OutputGetCredit(wallet, txout, filter);
+            auto c = OutputGetCredit(wallet, txout, filter);
+            if ( c > MAX_MINING_UTXO_MONEY )
+            {
+                nCredit += c; // do not count mining dust
+            }
+            
             if (!MoneyRange(nCredit))
                 throw std::runtime_error(std::string(__func__) + " : value out of range");
         }
@@ -314,6 +319,13 @@ Balance GetBalance(const CWallet& wallet, const int min_depth, bool avoid_reuse)
             }
             ret.m_mine_immature += CachedTxGetImmatureCredit(wallet, wtx, ISMINE_SPENDABLE);
             ret.m_watchonly_immature += CachedTxGetImmatureCredit(wallet, wtx, ISMINE_WATCH_ONLY);
+
+            if (is_trusted && tx_depth >= COINBASE_MATURITY()) {
+                ret.m_mine_stakeable += tx_credit_mine;
+            } else {
+                ret.m_mine_immature_stakeable += tx_credit_mine;
+            }
+
         }
     }
     return ret;

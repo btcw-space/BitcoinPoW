@@ -45,8 +45,8 @@ if BUILD_BITCOIN_KERNEL_LIB
 LIBBITCOINKERNEL=libbitcoinkernel.la
 endif
 if ENABLE_WALLET
-LIBBITCOIN_WALLET=libbitcoin_wallet.a
-LIBBITCOIN_WALLET_TOOL=libbitcoin_wallet_tool.a
+#LIBBITCOIN_WALLET=libbitcoin_wallet.a
+#LIBBITCOIN_WALLET_TOOL=libbitcoin_wallet_tool.a
 endif
 
 LIBBITCOIN_CRYPTO = $(LIBBITCOIN_CRYPTO_BASE)
@@ -102,7 +102,7 @@ endif
 
 if ENABLE_WALLET
 if BUILD_BITCOIN_WALLET
-  bin_PROGRAMS += bitcoin-wallet
+#  bin_PROGRAMS += bitcoin-wallet
 endif
 endif
 
@@ -244,6 +244,7 @@ BITCOIN_CORE_H = \
   policy/policy.h \
   policy/rbf.h \
   policy/settings.h \
+  pos.h \
   pow.h \
   protocol.h \
   psbt.h \
@@ -323,6 +324,7 @@ BITCOIN_CORE_H = \
   util/string.h \
   util/syserror.h \
   util/thread.h \
+  util/thread_pool.h \  
   util/threadinterrupt.h \
   util/threadnames.h \
   util/time.h \
@@ -374,8 +376,8 @@ obj/build.h: FORCE
 	  "$(abs_top_srcdir)"
 libbitcoin_util_a-clientversion.$(OBJEXT): obj/build.h
 
-# node #
-libbitcoin_node_a_CPPFLAGS = $(AM_CPPFLAGS) $(BITCOIN_INCLUDES) $(LEVELDB_CPPFLAGS) $(BOOST_CPPFLAGS) $(MINIUPNPC_CPPFLAGS) $(NATPMP_CPPFLAGS) $(EVENT_CFLAGS) $(EVENT_PTHREADS_CFLAGS)
+# node # 
+libbitcoin_node_a_CPPFLAGS = $(AM_CPPFLAGS) $(BITCOIN_INCLUDES) $(LEVELDB_CPPFLAGS) $(BOOST_CPPFLAGS) $(MINIUPNPC_CPPFLAGS) $(NATPMP_CPPFLAGS) $(EVENT_CFLAGS) $(EVENT_PTHREADS_CFLAGS) $(BDB_CPPFLAGS) $(SQLITE_CFLAGS)
 libbitcoin_node_a_CXXFLAGS = $(AM_CXXFLAGS) $(PIE_FLAGS)
 libbitcoin_node_a_SOURCES = \
   addrdb.cpp \
@@ -441,6 +443,7 @@ libbitcoin_node_a_SOURCES = \
   policy/packages.cpp \
   policy/rbf.cpp \
   policy/settings.cpp \
+  pos.cpp \
   pow.cpp \
   rest.cpp \
   rpc/blockchain.cpp \
@@ -472,6 +475,43 @@ libbitcoin_node_a_SOURCES = \
 if ENABLE_WALLET
 libbitcoin_node_a_SOURCES += wallet/init.cpp
 libbitcoin_node_a_CPPFLAGS += $(BDB_CPPFLAGS)
+libbitcoin_node_a_SOURCES += wallet/coincontrol.cpp
+libbitcoin_node_a_SOURCES += wallet/context.cpp
+libbitcoin_node_a_SOURCES += wallet/crypter.cpp
+libbitcoin_node_a_SOURCES += wallet/db.cpp
+libbitcoin_node_a_SOURCES += wallet/dump.cpp
+libbitcoin_node_a_SOURCES += wallet/external_signer_scriptpubkeyman.cpp
+libbitcoin_node_a_SOURCES += wallet/feebumper.cpp
+libbitcoin_node_a_SOURCES += wallet/fees.cpp
+libbitcoin_node_a_SOURCES += wallet/interfaces.cpp
+libbitcoin_node_a_SOURCES += wallet/load.cpp
+libbitcoin_node_a_SOURCES += wallet/receive.cpp
+libbitcoin_node_a_SOURCES += wallet/rpc/addresses.cpp
+libbitcoin_node_a_SOURCES += wallet/rpc/backup.cpp
+libbitcoin_node_a_SOURCES += wallet/rpc/coins.cpp
+libbitcoin_node_a_SOURCES += wallet/rpc/encrypt.cpp
+libbitcoin_node_a_SOURCES += wallet/rpc/spend.cpp
+libbitcoin_node_a_SOURCES += wallet/rpc/signmessage.cpp
+libbitcoin_node_a_SOURCES += wallet/rpc/transactions.cpp
+libbitcoin_node_a_SOURCES += wallet/rpc/util.cpp
+libbitcoin_node_a_SOURCES += wallet/rpc/wallet.cpp
+libbitcoin_node_a_SOURCES += wallet/scriptpubkeyman.cpp
+libbitcoin_node_a_SOURCES += wallet/spend.cpp
+libbitcoin_node_a_SOURCES += wallet/transaction.cpp
+libbitcoin_node_a_SOURCES += wallet/wallet.cpp
+libbitcoin_node_a_SOURCES += wallet/walletdb.cpp
+libbitcoin_node_a_SOURCES += wallet/walletutil.cpp
+libbitcoin_node_a_SOURCES += wallet/coinselection.cpp
+libbitcoin_node_a_SOURCES += $(BITCOIN_CORE_H)
+
+if USE_SQLITE
+libbitcoin_node_a_SOURCES += wallet/sqlite.cpp
+endif
+if USE_BDB
+libbitcoin_node_a_SOURCES += wallet/bdb.cpp wallet/salvage.cpp
+endif
+
+
 endif
 if !ENABLE_WALLET
 libbitcoin_node_a_SOURCES += dummywallet.cpp
@@ -492,52 +532,52 @@ endif
 #
 
 # wallet #
-libbitcoin_wallet_a_CPPFLAGS = $(AM_CPPFLAGS) $(BITCOIN_INCLUDES) $(BOOST_CPPFLAGS) $(BDB_CPPFLAGS) $(SQLITE_CFLAGS)
-libbitcoin_wallet_a_CXXFLAGS = $(AM_CXXFLAGS) $(PIE_FLAGS)
-libbitcoin_wallet_a_SOURCES = \
-  wallet/coincontrol.cpp \
-  wallet/context.cpp \
-  wallet/crypter.cpp \
-  wallet/db.cpp \
-  wallet/dump.cpp \
-  wallet/external_signer_scriptpubkeyman.cpp \
-  wallet/feebumper.cpp \
-  wallet/fees.cpp \
-  wallet/interfaces.cpp \
-  wallet/load.cpp \
-  wallet/receive.cpp \
-  wallet/rpc/addresses.cpp \
-  wallet/rpc/backup.cpp \
-  wallet/rpc/coins.cpp \
-  wallet/rpc/encrypt.cpp \
-  wallet/rpc/spend.cpp \
-  wallet/rpc/signmessage.cpp \
-  wallet/rpc/transactions.cpp \
-  wallet/rpc/util.cpp \
-  wallet/rpc/wallet.cpp \
-  wallet/scriptpubkeyman.cpp \
-  wallet/spend.cpp \
-  wallet/transaction.cpp \
-  wallet/wallet.cpp \
-  wallet/walletdb.cpp \
-  wallet/walletutil.cpp \
-  wallet/coinselection.cpp \
-  $(BITCOIN_CORE_H)
-
-if USE_SQLITE
-libbitcoin_wallet_a_SOURCES += wallet/sqlite.cpp
-endif
-if USE_BDB
-libbitcoin_wallet_a_SOURCES += wallet/bdb.cpp wallet/salvage.cpp
-endif
+#libbitcoin_wallet_a_CPPFLAGS = $(AM_CPPFLAGS) $(BITCOIN_INCLUDES) $(BOOST_CPPFLAGS) $(BDB_CPPFLAGS) $(SQLITE_CFLAGS)
+#libbitcoin_wallet_a_CXXFLAGS = $(AM_CXXFLAGS) $(PIE_FLAGS)
+#libbitcoin_wallet_a_SOURCES = \
+#  wallet/coincontrol.cpp \
+#  wallet/context.cpp \
+#  wallet/crypter.cpp \
+#  wallet/db.cpp \
+#  wallet/dump.cpp \
+#  wallet/external_signer_scriptpubkeyman.cpp \
+#  wallet/feebumper.cpp \
+#  wallet/fees.cpp \
+#  wallet/interfaces.cpp \
+#  wallet/load.cpp \
+#  wallet/receive.cpp \
+#  wallet/rpc/addresses.cpp \
+#  wallet/rpc/backup.cpp \
+#  wallet/rpc/coins.cpp \
+#  wallet/rpc/encrypt.cpp \
+#  wallet/rpc/spend.cpp \
+#  wallet/rpc/signmessage.cpp \
+#  wallet/rpc/transactions.cpp \
+#  wallet/rpc/util.cpp \
+#  wallet/rpc/wallet.cpp \
+#  wallet/scriptpubkeyman.cpp \
+#  wallet/spend.cpp \
+#  wallet/transaction.cpp \
+#  wallet/wallet.cpp \
+#  wallet/walletdb.cpp \
+#  wallet/walletutil.cpp \
+#  wallet/coinselection.cpp \
+#  $(BITCOIN_CORE_H)
+#
+#if USE_SQLITE
+#libbitcoin_wallet_a_SOURCES += wallet/sqlite.cpp
+#endif
+#if USE_BDB
+#libbitcoin_wallet_a_SOURCES += wallet/bdb.cpp wallet/salvage.cpp
+#endif
 #
 
 # wallet tool #
-libbitcoin_wallet_tool_a_CPPFLAGS = $(AM_CPPFLAGS) $(BITCOIN_INCLUDES) $(BOOST_CPPFLAGS)
-libbitcoin_wallet_tool_a_CXXFLAGS = $(AM_CXXFLAGS) $(PIE_FLAGS)
-libbitcoin_wallet_tool_a_SOURCES = \
-  wallet/wallettool.cpp \
-  $(BITCOIN_CORE_H)
+#libbitcoin_wallet_tool_a_CPPFLAGS = $(AM_CPPFLAGS) $(BITCOIN_INCLUDES) $(BOOST_CPPFLAGS)
+#libbitcoin_wallet_tool_a_CXXFLAGS = $(AM_CXXFLAGS) $(PIE_FLAGS)
+#libbitcoin_wallet_tool_a_SOURCES = \
+#  wallet/wallettool.cpp \
+#  $(BITCOIN_CORE_H)
 #
 
 # crypto #
@@ -848,26 +888,26 @@ bitcoin_tx_LDADD = \
 #
 
 # bitcoin-wallet binary #
-bitcoin_wallet_SOURCES = bitcoin-wallet.cpp
-bitcoin_wallet_SOURCES += init/bitcoin-wallet.cpp
-bitcoin_wallet_CPPFLAGS = $(bitcoin_bin_cppflags)
-bitcoin_wallet_CXXFLAGS = $(bitcoin_bin_cxxflags)
-bitcoin_wallet_LDFLAGS = $(bitcoin_bin_ldflags)
-bitcoin_wallet_LDADD = \
-  $(LIBBITCOIN_WALLET_TOOL) \
-  $(LIBBITCOIN_WALLET) \
-  $(LIBBITCOIN_COMMON) \
-  $(LIBBITCOIN_UTIL) \
-  $(LIBUNIVALUE) \
-  $(LIBBITCOIN_CONSENSUS) \
-  $(LIBBITCOIN_CRYPTO) \
-  $(LIBSECP256K1) \
-  $(BDB_LIBS) \
-  $(SQLITE_LIBS)
-
-if TARGET_WINDOWS
-bitcoin_wallet_SOURCES += bitcoin-wallet-res.rc
-endif
+#bitcoin_wallet_SOURCES = bitcoin-wallet.cpp
+#bitcoin_wallet_SOURCES += init/bitcoin-wallet.cpp
+#bitcoin_wallet_CPPFLAGS = $(bitcoin_bin_cppflags)
+#bitcoin_wallet_CXXFLAGS = $(bitcoin_bin_cxxflags)
+#bitcoin_wallet_LDFLAGS = $(bitcoin_bin_ldflags)
+#bitcoin_wallet_LDADD = \
+#  $(LIBBITCOIN_WALLET_TOOL) \
+#  $(LIBBITCOIN_WALLET) \
+#  $(LIBBITCOIN_COMMON) \
+#  $(LIBBITCOIN_UTIL) \
+#  $(LIBUNIVALUE) \
+#  $(LIBBITCOIN_CONSENSUS) \
+#  $(LIBBITCOIN_CRYPTO) \
+#  $(LIBSECP256K1) \
+#  $(BDB_LIBS) \
+#  $(SQLITE_LIBS)
+#
+#if TARGET_WINDOWS
+#bitcoin_wallet_SOURCES += bitcoin-wallet-res.rc
+#endif
 #
 
 # bitcoin-util binary #
@@ -956,6 +996,7 @@ libbitcoinkernel_la_SOURCES = \
   policy/policy.cpp \
   policy/rbf.cpp \
   policy/settings.cpp \
+  pos.cpp \
   pow.cpp \
   primitives/block.cpp \
   primitives/transaction.cpp \

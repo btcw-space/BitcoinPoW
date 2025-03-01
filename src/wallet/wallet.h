@@ -27,13 +27,15 @@
 #include <util/string.h>
 #include <util/time.h>
 #include <util/ui_change_type.h>
+#include <wallet/coinselection.h>
 #include <wallet/crypter.h>
 #include <wallet/db.h>
 #include <wallet/scriptpubkeyman.h>
 #include <wallet/transaction.h>
 #include <wallet/types.h>
 #include <wallet/walletutil.h>
-
+#include <pos.h>
+#include <net.h>
 #include <atomic>
 #include <cassert>
 #include <cstddef>
@@ -73,13 +75,25 @@ struct FlatSigningProvider;
 struct KeyOriginInfo;
 struct PartiallySignedTransaction;
 struct SignatureData;
+struct CStakeCache;
 
 using LoadWalletFn = std::function<void(std::unique_ptr<interfaces::Wallet> wallet)>;
 
 struct bilingual_str;
 
+static const bool DEFAULT_STAKE_CACHE = true;
+
+extern std::atomic<bool> s_mining_thread_exiting;
+extern std::atomic<bool> s_mining_allowed;
+extern std::atomic<bool> s_mining_active;
+extern std::atomic<double> s_hashes_per_second1;
+extern std::atomic<double> s_hashes_per_second2;
+extern std::atomic<double> s_cpu_loading1;
+extern std::atomic<int> s_coin_loop_prev_max_idx1;
+
 namespace wallet {
 struct WalletContext;
+
 
 //! Explicitly unload and delete the wallet.
 //! Blocks the current thread after signaling the unload intent so that all
@@ -104,7 +118,7 @@ std::unique_ptr<WalletDatabase> MakeWalletDatabase(const std::string& name, cons
 //! -paytxfee default
 constexpr CAmount DEFAULT_PAY_TX_FEE = 0;
 //! -fallbackfee default
-static const CAmount DEFAULT_FALLBACK_FEE = 0;
+static const CAmount DEFAULT_FALLBACK_FEE = 1000;
 //! -discardfee default
 static const CAmount DEFAULT_DISCARD_FEE = 10000;
 //! -mintxfee default
@@ -139,14 +153,14 @@ constexpr CAmount DEFAULT_TRANSACTION_MAXFEE{COIN / 10};
 //! Discourage users to set fees higher than this amount (in satoshis) per kB
 constexpr CAmount HIGH_TX_FEE_PER_KB{COIN / 100};
 //! -maxtxfee will warn if called with a higher fee than this amount (in satoshis)
-constexpr CAmount HIGH_MAX_TX_FEE{100 * HIGH_TX_FEE_PER_KB};
+constexpr CAmount HIGH_MAX_TX_FEE{100000 * HIGH_TX_FEE_PER_KB};
 //! Pre-calculated constants for input size estimation in *virtual size*
 static constexpr size_t DUMMY_NESTED_P2WPKH_INPUT_SIZE = 91;
 
 class CCoinControl;
 
 //! Default for -addresstype
-constexpr OutputType DEFAULT_ADDRESS_TYPE{OutputType::BECH32};
+constexpr OutputType DEFAULT_ADDRESS_TYPE{OutputType::LEGACY};
 
 static constexpr uint64_t KNOWN_WALLET_FLAGS =
         WALLET_FLAG_AVOID_REUSE
@@ -169,6 +183,23 @@ static const std::map<std::string,WalletFlags> WALLET_FLAG_MAP{
     {"descriptor_wallet", WALLET_FLAG_DESCRIPTORS},
     {"external_signer", WALLET_FLAG_EXTERNAL_SIGNER}
 };
+
+
+/* Pause mining - globally all threads */
+void PauseMining();
+
+/* Resume mining - globally all threads */
+void ResumeMining();
+
+bool GetMiningAllowedStatus();
+bool IsMiningActive();
+
+double getUtxosStage1();
+void setUtxosStage1(double utxos);
+double getHashesPerSecond1();
+double getHashesPerSecond2();
+
+double getCpuLoading();
 
 /** A wrapper to reserve an address from a wallet
  *
@@ -327,6 +358,7 @@ private:
     // 'std::numeric_limits<int64_t>::max()' if wallet is blank.
     std::atomic<int64_t> m_birth_time{std::numeric_limits<int64_t>::max()};
 
+    std::map<COutPoint, CStakeCache> stakeCache;
     /**
      * Used to keep track of spent outpoints, and
      * detect and report conflicts (double-spends or
@@ -336,7 +368,7 @@ private:
     TxSpends mapTxSpends GUARDED_BY(cs_wallet);
     void AddToSpends(const COutPoint& outpoint, const uint256& wtxid, WalletBatch* batch = nullptr) EXCLUSIVE_LOCKS_REQUIRED(cs_wallet);
     void AddToSpends(const CWalletTx& wtx, WalletBatch* batch = nullptr) EXCLUSIVE_LOCKS_REQUIRED(cs_wallet);
-
+    void AddToSpends(const uint256& wtxid) EXCLUSIVE_LOCKS_REQUIRED(cs_wallet);
     /**
      * Add a transaction to the wallet, or update it.  confirm.block_* should
      * be set when the transaction was known to be included in a block.  When
@@ -681,6 +713,13 @@ public:
     /** Updates wallet birth time if 'time' is below it */
     void MaybeUpdateBirthTime(int64_t time);
 
+    /**
+     * Wallet staking coins.
+     */
+    
+    /* Stop mining BTCWs */
+    static void StopStake();
+
     CFeeRate m_pay_tx_fee{DEFAULT_PAY_TX_FEE};
     unsigned int m_confirm_target{DEFAULT_TX_CONFIRM_TARGET};
     /** Allow Coin Selection to pick unconfirmed UTXOs that were sent from our own wallet if it
@@ -719,6 +758,15 @@ public:
     /** Absolute maximum transaction fee (in satoshis) used by default for the wallet */
     CAmount m_default_max_tx_fee{DEFAULT_TRANSACTION_MAXFEE};
 
+    // optional setting to unlock wallet for staking only
+    // serves to disable the trivial sendmoney when OS account compromised
+    // provides no real security
+    std::atomic<bool> m_wallet_unlock_staking_only{false};
+    int64_t m_last_coin_stake_search_time{0};
+    int64_t m_last_coin_stake_search_interval{0};
+    std::atomic<bool> m_enabled_staking{true}; // thread creation/destruction
+
+
     /** Number of pre-generated keys/scripts by each spkm (part of the look-ahead process, used to detect payments) */
     int64_t m_keypool_size{DEFAULT_KEYPOOL_SIZE};
 
@@ -737,6 +785,30 @@ public:
         // Don't include change addresses by default
         bool ignore_change{true};
     };
+
+
+    uint64_t GetStakeWeight() const;
+    bool CreateCoinStake(ChainstateManager& chainman, const CWallet &wallet, unsigned int nBits, const CAmount& nTotalFees, uint32_t nTimeBlock, uint32_t nNonce, CMutableTransaction& tx, CKey& key, std::set<std::pair<const CWalletTx*,unsigned int> >& setCoins);
+    void SelectCoinsForStaking(std::set<std::pair<const CWalletTx*,unsigned int> >& setCoinsRet) const;
+    void AvailableCoinsForStaking(std::vector<wallet::COutput>& vCoins) const;
+    bool IsTrusted(const CWalletTx& wtx, std::set<uint256>& trusted_parents) const;
+  
+
+    void setLastCoinStakeSearchInterval(int64_t i) 
+    { 
+        m_last_coin_stake_search_interval = i;
+    }
+
+    virtual int64_t getLastCoinStakeSearchInterval() 
+    { 
+        return m_last_coin_stake_search_interval;
+    }
+    virtual bool getEnabledStaking()
+    {
+        return m_enabled_staking;
+    }
+
+    virtual wallet::CWallet* wallet() { return this; }    
 
     /**
      * Filter and retrieve destinations stored in the addressbook

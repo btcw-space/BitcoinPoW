@@ -3,7 +3,7 @@
     <name>AddressBookPage</name>
     <message>
         <source>Right-click to edit address or label</source>
-        <translation type="unfinished">पते या लेबल में बदलाव करने के लिए राइट-क्लिक करें</translation>
+        <translation type="unfinished">पता या लेबल संपादित करने के लिए राइट-क्लिक करें</translation>
     </message>
     <message>
         <source>Create a new address</source>
@@ -15,7 +15,7 @@
     </message>
     <message>
         <source>Copy the currently selected address to the system clipboard</source>
-        <translation type="unfinished">चुने गए मौजूदा पते को सिस्टम क्लिपबोर्ड पर कॉपी करें</translation>
+        <translation type="unfinished">मौजूदा चयनित पते को सिस्टम क्लिपबोर्ड पर कॉपी करें</translation>
     </message>
     <message>
         <source>&amp;Copy</source>
@@ -27,7 +27,7 @@
     </message>
     <message>
         <source>Delete the currently selected address from the list</source>
-        <translation type="unfinished">सूची से अभी चुना गया पता डिलीट करें</translation>
+        <translation type="unfinished">सूची से मौजूदा चयनित पता हटाएं</translation>
     </message>
     <message>
         <source>Enter address or label to search</source>
@@ -35,7 +35,7 @@
     </message>
     <message>
         <source>Export the data in the current tab to a file</source>
-        <translation type="unfinished">मौजूदा टैब में डेटा को फ़ाइल में एक्सपोर्ट करें</translation>
+        <translation type="unfinished">मौजूदा टैब में डेटा को फ़ाइल में निर्यात करें</translation>
     </message>
     <message>
         <source>&amp;Export</source>
@@ -43,7 +43,7 @@
     </message>
     <message>
         <source>&amp;Delete</source>
-        <translation type="unfinished">डिलीट करें</translation>
+        <translation type="unfinished">मिटाना</translation>
     </message>
     <message>
         <source>Choose the address to send coins to</source>
@@ -55,7 +55,7 @@
     </message>
     <message>
         <source>C&amp;hoose</source>
-        <translation type="unfinished">&amp;चुनें</translation>
+        <translation type="unfinished">&amp;चुज़</translation>
     </message>
     <message>
         <source>These are your Bitcoin addresses for sending payments. Always check the amount and the receiving address before sending coins.</source>
@@ -69,19 +69,19 @@ Signing is only possible with addresses of the type 'legacy'.</source>
     </message>
     <message>
         <source>&amp;Copy Address</source>
-        <translation type="unfinished">&amp;पता कॉपी करें</translation>
+        <translation type="unfinished">&amp;कॉपी पता</translation>
     </message>
     <message>
         <source>Copy &amp;Label</source>
-        <translation type="unfinished">&amp;लेबल कॉपी करें</translation>
+        <translation type="unfinished">कॉपी और लेबल</translation>
     </message>
     <message>
         <source>&amp;Edit</source>
-        <translation type="unfinished">&amp;बदलाव करें</translation>
+        <translation type="unfinished">&amp;एडीट</translation>
     </message>
     <message>
         <source>Export Address List</source>
-        <translation type="unfinished">पते की सूची को एक्सपोर्ट करें</translation>
+        <translation type="unfinished">पता की सूची को निर्यात करें</translation>
     </message>
     <message>
         <source>Comma separated file</source>
@@ -94,12 +94,8 @@ Signing is only possible with addresses of the type 'legacy'.</source>
         <translation type="unfinished">पता सूची को %1यहां सहेजने का प्रयास करते समय एक त्रुटि हुई . कृपया पुन: प्रयास करें।</translation>
     </message>
     <message>
-        <source>Sending addresses - %1</source>
-        <translation type="unfinished">पते भेजे जा रहे हैं - %1</translation>
-    </message>
-    <message>
         <source>Exporting Failed</source>
-        <translation type="unfinished">एक्सपोर्ट नहीं हो पाया</translation>
+        <translation type="unfinished">निर्यात विफल हो गया है</translation>
     </message>
 </context>
 <context>
@@ -125,7 +121,7 @@ Signing is only possible with addresses of the type 'legacy'.</source>
     </message>
     <message>
         <source>Enter passphrase</source>
-        <translation type="unfinished">पासफ्रेज़ दर्ज करें</translation>
+        <translation type="unfinished">पासफ़्रेज़ मे प्रवेश करें</translation>
     </message>
     <message>
         <source>New passphrase</source>
@@ -520,14 +516,6 @@ Signing is only possible with addresses of the type 'legacy'.</source>
         <source>Load PSBT from &amp;clipboard…</source>
         <translation type="unfinished">पीएसबीटी को &amp;क्लिपबोर्ड से लोड करें…</translation>
     </message>
-    <message>
-        <source>Migrate Wallet</source>
-        <translation type="unfinished">वॉलेट माइग्रेट करें</translation>
-    </message>
-    <message>
-        <source>Migrate a wallet</source>
-        <translation type="unfinished">कोई वॉलेट माइग्रेट करें</translation>
-    </message>
     <message numerus="yes">
         <source>%n active connection(s) to Bitcoin network.</source>
         <extracomment>A substring of the tooltip.</extracomment>
@@ -681,21 +669,6 @@ Signing is only possible with addresses of the type 'legacy'.</source>
         <source>Loading wallets…</source>
         <extracomment>Descriptive text of the load wallets progress window which indicates to the user that wallets are currently being loaded.</extracomment>
         <translation type="unfinished">वॉलेट लोड हो रहा है...</translation>
-    </message>
-</context>
-<context>
-    <name>MigrateWalletActivity</name>
-    <message>
-        <source>Migrate Wallet</source>
-        <translation type="unfinished">वॉलेट माइग्रेट करें</translation>
-    </message>
-    <message>
-        <source>Migration failed</source>
-        <translation type="unfinished">माइग्रेशन नहीं हो पाया</translation>
-    </message>
-    <message>
-        <source>Migration Successful</source>
-        <translation type="unfinished">माइग्रेशन हो गया</translation>
     </message>
 </context>
 <context>

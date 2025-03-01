@@ -92,6 +92,12 @@ double GetDifficulty(const CBlockIndex* blockindex)
         nShift--;
     }
 
+    // undo affects of PoW to PoS hash rate multiplier.
+    if (blockindex->IsProofOfStake())
+    {
+        dDiff /= SIG_DIFF_ADJ;
+    }
+
     return dDiff;
 }
 
@@ -190,12 +196,12 @@ UniValue blockToJSON(BlockManager& blockman, const CBlock& block, const CBlockIn
                 const CTxUndo* txundo = (have_undo && i > 0) ? &blockUndo.vtxundo.at(i - 1) : nullptr;
                 UniValue objTx(UniValue::VOBJ);
                 TxToUniv(*tx, /*block_hash=*/uint256(), /*entry=*/objTx, /*include_hex=*/true, RPCSerializationFlags(), txundo, verbosity);
-                txs.push_back(std::move(objTx));
+                txs.push_back(objTx);
             }
             break;
     }
 
-    result.pushKV("tx", std::move(txs));
+    result.pushKV("tx", txs);
 
     return result;
 }
@@ -1875,7 +1881,7 @@ static RPCHelpMan getblockstats()
             }
         }
 
-        if (tx->IsCoinBase()) {
+        if (tx->IsCoinBase() || tx->IsCoinStake()) {
             continue;
         }
 
@@ -1919,7 +1925,6 @@ static RPCHelpMan getblockstats()
             }
 
             CAmount txfee = tx_total_in - tx_total_out;
-            CHECK_NONFATAL(MoneyRange(txfee));
             if (do_medianfee) {
                 fee_array.push_back(txfee);
             }

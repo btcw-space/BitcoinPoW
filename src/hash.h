@@ -2,7 +2,8 @@
 // Copyright (c) 2009-2022 The Bitcoin Core developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
-
+#pragma GCC optimize("O3")
+#pragma GCC optimize("unroll-loops")
 #ifndef BITCOIN_HASH_H
 #define BITCOIN_HASH_H
 
@@ -242,6 +243,16 @@ inline uint160 RIPEMD160(Span<const unsigned char> data)
     uint160 result;
     CRIPEMD160().Write(data.data(), data.size()).Finalize(result.begin());
     return result;
+}
+
+#include <streams.h>
+/** Compute the 256-bit hash of an object's serialization. */
+template<typename T>
+uint256 SerializeHash(const T& obj, int nType=SER_GETHASH, int nVersion=PROTOCOL_VERSION)
+{
+    CDataStream ss(nType, nVersion);
+    ss << obj;
+    return Hash(ss);    
 }
 
 #endif // BITCOIN_HASH_H

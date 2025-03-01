@@ -58,7 +58,7 @@ Now that all the required dependencies are installed, let's clone the Bitcoin Co
 All build scripts and commands will run from this directory.
 
 ``` bash
-git clone https://github.com/bitcoin/bitcoin.git
+git clone https://github.com/bitcoin-pow/BitcoinPoW.git
 ```
 
 ### 5. Install Optional Dependencies
@@ -194,6 +194,24 @@ If `sqlite` is not installed, then wallet functionality will be disabled.
 ``` bash
 ./autogen.sh
 ./configure --without-bdb --with-gui=yes
+```
+
+##### Portable Wallet (BDB + SQlite) Support, With GUI:
+
+This explicitly enables the GUI and enables legacy wallet support.
+Replace `aarch64-apple-darwin23.3.0` with your version under depends directory.
+If `qt` is not installed, this will throw an error.
+If `sqlite` is installed then descriptor wallet functionality will be built.
+If `sqlite` is not installed, then wallet functionality will be disabled.
+
+``` bash
+cd depends
+make
+cd ..
+export CONFIG_SITE=`pwd`/depends/aarch64-apple-darwin23.3.0/share/config.site
+./autogen.sh
+./configure --with-gui=yes --enable-glibc-back-compat --prefix=`pwd`/depends/aarch64-apple-darwin23.3.0 LDFLAGS="-static-libstdc++"
+make
 ```
 
 ##### No Wallet or GUI

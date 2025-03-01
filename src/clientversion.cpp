@@ -16,7 +16,7 @@
  * for both bitcoind and bitcoin-qt, to make it harder for attackers to
  * target servers or GUI users specifically.
  */
-const std::string CLIENT_NAME("Satoshi");
+const std::string CLIENT_NAME("Bitcoin-PoW");
 
 
 #ifdef HAVE_BUILD_INFO
@@ -28,16 +28,17 @@ const std::string CLIENT_NAME("Satoshi");
 //   - "// No build information available", if proper git information is not available
 #endif
 
-//! git will put "#define GIT_COMMIT_ID ..." on the next line inside archives. $Format:%n#define GIT_COMMIT_ID "%H"$
+//! git will put "#define GIT_COMMIT_ID ..." on the next line inside archives. 
+#define GIT_COMMIT_ID "2579ecfb3283b81b440b7ca1da1a43649d8cdb91"
+#define GIT_COMMIT_ID "80e9d03790538a4bf0906184bd5f2d4682a6a417" 
 
 #ifdef BUILD_GIT_TAG
     #define BUILD_DESC BUILD_GIT_TAG
     #define BUILD_SUFFIX ""
 #else
-    #define BUILD_DESC "v" PACKAGE_VERSION
-    #if CLIENT_VERSION_IS_RELEASE
-        #define BUILD_SUFFIX ""
-    #elif defined(BUILD_GIT_COMMIT)
+    #define BUILD_DESC "v" STRINGIZE(CLIENT_VERSION_MAJOR) "." STRINGIZE(CLIENT_VERSION_MINOR) \
+                       "." STRINGIZE(CLIENT_VERSION_BUILD)
+    #ifdef BUILD_GIT_COMMIT
         #define BUILD_SUFFIX "-" BUILD_GIT_COMMIT
     #elif defined(GIT_COMMIT_ID)
         #define BUILD_SUFFIX "-g" GIT_COMMIT_ID
@@ -91,7 +92,7 @@ std::string CopyrightHolders(const std::string& strPrefix)
 
 std::string LicenseInfo()
 {
-    const std::string URL_SOURCE_CODE = "<https://github.com/bitcoin/bitcoin>";
+    const std::string URL_SOURCE_CODE = "<https://github.com/bitcoin-pow/BitcoinPoW>";
 
     return CopyrightHolders(strprintf(_("Copyright (C) %i-%i").translated, 2009, COPYRIGHT_YEAR) + " ") + "\n" +
            "\n" +

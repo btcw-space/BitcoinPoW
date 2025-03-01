@@ -1,0 +1,39 @@
+{
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "(gdb) Launch",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "/home/ubuntu/dev/BitcoinPoW/src/qt/bitcoin-qt",
+            "args": ["--emergencymining=1","--rescan=0", "--miningthreads=12", "automine=0"], 
+            //"args": ["--listen=0", "--server=0"], 
+            //    ./bitcoin-qt --emergencymining=1 --rescan=0 --miningthreads=18 -cpuloading=80 -datadir=/home/ubuntu/.bitcoin-pow &
+            //    ./bitcoin-qt -listen=0 -forcednsseed=0 -datadir=/home/ubuntu/.btcw2/ -connect=127.0.0.1 &
+            // ./bitcoind --emergencymining=1 --miningthreads=12 --cpuloading=80 --datadir=/home/ubuntu/.bitcoin-pow
+            // ./bitcoin-cli --rpccookiefile=/home/ubuntu/.bitcoin-pow/.cookie generate
+            // ./bitcoin-cli --rpccookiefile=/home/ubuntu/.bitcoin-pow/.cookie getmininginfo            
+            "stopAtEntry": false,
+            "cwd": "${fileDirname}",
+            "environment": [],
+            "externalConsole": false,
+            "MIMode": "gdb",
+            "setupCommands": [
+                {
+                    "description": "Enable pretty-printing for gdb",
+                    "text": "-enable-pretty-printing",
+                    "ignoreFailures": true
+                },
+                {
+                    "description": "Set Disassembly Flavor to Intel",
+                    "text": "-gdb-set disassembly-flavor intel",
+                    "ignoreFailures": true
+                }
+            ]
+        }
+
+    ]
+}

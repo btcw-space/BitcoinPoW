@@ -1,78 +1,48 @@
-Bitcoin Core integration/staging tree
+Bitcoin PoW (BTCW) - White paper (10,000 ft view)
 =====================================
 
-https://bitcoincore.org
+https://www.bitcoin-pow.org
 
-For an immediately usable, binary version of the Bitcoin Core software, see
-https://bitcoincore.org/en/download/.
+https://www.twitter.com/bitcoin_pow
 
-What is Bitcoin Core?
----------------------
+https://t.me/BitcoinPoWPoT
 
-Bitcoin Core connects to the Bitcoin peer-to-peer network to download and fully
-validate blocks and transactions. It also includes a wallet and graphical user
-interface, which can be optionally built.
 
-Further information about Bitcoin Core is available in the [doc folder](/doc).
+BitcoinPoW is Bitcoin using Proof of Work(PoW) / Proof of Stake(Pos) / Proof of Transactions (PoT)
+----------------
+```
+Satoshi's original Bitcoin has become very mining centralized. BitcoinPow enables a highly mining distributed 
+system where every wallet is forced to solo mine by using a two part approach as follows:
 
-License
+1) Mining using utxos. Find a txid that solves the hashing function. The coinstake is created and the signature
+   used in the coinstake will be checked against that in part 2. Keep utxos amount as small as possible, larger
+   utxos amounts do not offer any benefit compared with small amounts, ex: use 0.00001 BTCW to send.
+
+2) Mine using a new 64 bit nonce and combine with the block signature to create some mud. Throw the mud thru
+   a sha256 hash function and check if the hash meets a new threshold. Repeat as PoW.
+
+
+The validator will check to make sure that the signature in (1) matches the signature in (2) that was used
+to sign the work and that both parts meet the thresholds for acceptance. Since the signatures must match,
+the private key must be shared between (1) and (2). Sharing private keys will eliminate mining pools because all
+trust is now lost.
+
+The other attempt at pool formation will be to have the users only perform (1) and then send back to the pool for the
+pool to finish doing (2). This will fail because the amount of work to do (1) is about 1% of the total work and the
+remaining 99% of the work is in (2). This means that users would send work back to the pool and sit idle for 99% of 
+the block time on average waiting for new work. Users have no benefit of using a pool and the pool will not form,
+it they do form, they will be very unhealty pools that do not offer benefit to the users nor the pool owner.
+```
+
+How to mine
 -------
+```
+Goals of mining are simple. Create as many transactions for your mining needs. You can also create more transaction as a reserve for the future.
+Use the 'tx' command on the console to create transactions (type 'help tx').
+```
 
-Bitcoin Core is released under the terms of the MIT license. See [COPYING](COPYING) for more
-information or see https://opensource.org/licenses/MIT.
-
-Development Process
--------------------
-
-The `master` branch is regularly built (see `doc/build-*.md` for instructions) and tested, but it is not guaranteed to be
-completely stable. [Tags](https://github.com/bitcoin/bitcoin/tags) are created
-regularly from release branches to indicate new official, stable release versions of Bitcoin Core.
-
-The https://github.com/bitcoin-core/gui repository is used exclusively for the
-development of the GUI. Its master branch is identical in all monotree
-repositories. Release branches and tags do not exist, so please do not fork
-that repository unless it is for development reasons.
-
-The contribution workflow is described in [CONTRIBUTING.md](CONTRIBUTING.md)
-and useful hints for developers can be found in [doc/developer-notes.md](doc/developer-notes.md).
-
-Testing
+Notable Algorithm sources
 -------
+https://github.com/bitcoin-pow/BitcoinPoW/blob/26.x_btcw/src/pos.cpp
 
-Testing and code review is the bottleneck for development; we get more pull
-requests than we can review and test on short notice. Please be patient and help out by testing
-other people's pull requests, and remember this is a security-critical project where any mistake might cost people
-lots of money.
-
-### Automated Testing
-
-Developers are strongly encouraged to write [unit tests](src/test/README.md) for new code, and to
-submit new unit tests for old code. Unit tests can be compiled and run
-(assuming they weren't disabled in configure) with: `make check`. Further details on running
-and extending unit tests can be found in [/src/test/README.md](/src/test/README.md).
-
-There are also [regression and integration tests](/test), written
-in Python.
-These tests can be run (if the [test dependencies](/test) are installed) with: `test/functional/test_runner.py`
-
-The CI (Continuous Integration) systems make sure that every pull request is built for Windows, Linux, and macOS,
-and that unit/sanity tests are run automatically.
-
-### Manual Quality Assurance (QA) Testing
-
-Changes should be tested by somebody other than the developer who wrote the
-code. This is especially important for large or high-risk changes. It is useful
-to add a test plan to the pull request description if testing the changes is
-not straightforward.
-
-Translations
-------------
-
-Changes to translations as well as new translations can be submitted to
-[Bitcoin Core's Transifex page](https://www.transifex.com/bitcoin/bitcoin/).
-
-Translations are periodically pulled from Transifex and merged into the git repository. See the
-[translation process](doc/translation_process.md) for details on how this works.
-
-**Important**: We do not accept translation changes as GitHub pull requests because the next
-pull from Transifex would automatically overwrite them again.
+https://github.com/bitcoin-pow/BitcoinPoW/blob/26.x_btcw/src/validation.cpp

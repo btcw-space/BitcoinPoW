@@ -23,7 +23,7 @@
     </message>
     <message>
         <source>C&amp;lose</source>
-        <translation type="unfinished">&amp;Schliessen</translation>
+        <translation type="unfinished">&amp;Schließen</translation>
     </message>
     <message>
         <source>Delete the currently selected address from the list</source>
