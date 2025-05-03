@@ -1337,7 +1337,7 @@ bool CheckIndexProof(const CBlockIndex& block, const Consensus::Params& consensu
 
 #ifdef ENABLE_WALLET
 /* Sign a block */
-bool SignBlock(ChainstateManager& chainman, std::shared_ptr<CBlock> pblock, wallet::CWallet& wallet, const CAmount& nTotalFees, uint32_t nTime, uint32_t nNonce, std::set<std::pair<const wallet::CWalletTx*,unsigned int>> &setCoins, bool stop_mining_pools=true);
+bool SignBlock(ChainstateManager& chainman, std::shared_ptr<CBlock> pblock, wallet::CWallet& wallet, const CAmount& nTotalFees, uint32_t &nTime, uint32_t nNonce, std::set<std::pair<const wallet::CWalletTx*,unsigned int>> &setCoins, bool stop_mining_pools=true);
 #endif
 
 struct CHeightTxIndexKey {

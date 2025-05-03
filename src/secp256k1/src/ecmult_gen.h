@@ -29,12 +29,12 @@
 #define ECMULT_GEN_PREC_N(bits) (256 / bits)
 
 typedef struct {
-    /* Whether the context has been built. */
-    int built;
-
     /* Blinding values used when computing (n-b)G + bG. */
     secp256k1_scalar blind; /* -b */
     secp256k1_gej initial;  /* bG */
+
+    /* Whether the context has been built. */
+    int built;    
 } secp256k1_ecmult_gen_context;
 
 static void secp256k1_ecmult_gen_context_build(secp256k1_ecmult_gen_context* ctx);

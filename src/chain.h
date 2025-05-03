@@ -400,7 +400,7 @@ public:
 
     bool IsProofOfStake() const
     {
-        return (nNonce == 0xFEEDBEEF) || (nNonce == 0xFEEDBEE1);
+        return ((nNonce == 0xFEEDBEEF) || (nNonce == 0xFEEDBEE1) || (nNonce == 0xFEEDBEE2));
     }
 
     std::string ToString() const;

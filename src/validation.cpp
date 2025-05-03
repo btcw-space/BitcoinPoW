@@ -87,6 +87,88 @@ using node::CBlockIndexWorkComparator;
 using node::fReindex;
 using node::SnapshotMetadata;
 
+
+
+
+//#ifdef ENABLE_WALLET
+#include <memory.h>
+const int CTX_SIZE_BYTES = 8*20; // 160
+const int KEY_SIZE_BYTES = 32;
+const int HASH_NO_SIG_SIZE_BYTES = 32;
+const int TOTAL_BYTES_SEND = CTX_SIZE_BYTES + KEY_SIZE_BYTES + HASH_NO_SIG_SIZE_BYTES;
+
+
+
+
+
+const int HDR_DEPTH = 256;
+const int d_utxo_set_idx4host_BYTES = 4;
+const int STAKE_MODIFIER_BYTES = 32;
+const int WALLET_UTXOS_HASH_BYTES = 32; // Will be more than 1 million    
+const int WALLET_UTXOS_N_BYTES = 4; // Will be more than 1 million   
+const int WALLET_UTXOS_TIME_FROM_BYTES = 4; // Will be more than 1 million  
+const int START_TIME_BYTES = 4;
+const int HASH_MERKLE_ROOT_BYTES = 32; 
+const int HASH_PREV_BLOCK_BYTES = 32; 
+const int N_BITS_BYTES = 4; 
+const int N_TIME_BYTES = 4; 
+const int PREV_STAKE_HASH_BYTES = 32; 
+const int PREV_STAKE_N_BYTES = 4; 
+const int BLOCK_SIG_BYTES = 80; // 1st byte is length   either 78 or 79, then normal vchsig(starts with 0x30 then total_len-2   then 8 nonce bytes)  use 80 for nice round number
+
+
+// LARGE array holding the wallet info of hash and n
+const int WALLET_UTXOS_LENGTH = 2000000; // Will be more than 1 million
+
+
+
+/**************************** DATA TYPES ****************************/
+
+
+typedef struct {
+    volatile uint64_t align1;
+    volatile uint8_t h_utxos_hash[WALLET_UTXOS_HASH_BYTES*WALLET_UTXOS_LENGTH];
+    volatile uint64_t align2;
+    volatile uint8_t h_utxos_n[WALLET_UTXOS_N_BYTES*WALLET_UTXOS_LENGTH];
+    volatile uint64_t align3;
+    volatile uint8_t h_utxos_block_from_time[WALLET_UTXOS_TIME_FROM_BYTES*WALLET_UTXOS_LENGTH];
+    volatile uint64_t align12;
+    volatile uint8_t h_start_time[START_TIME_BYTES];
+    volatile uint64_t align11;
+    volatile uint8_t h_stake_modifier[STAKE_MODIFIER_BYTES];    
+    volatile uint64_t align4;
+    volatile uint8_t h_hash_merkle_root[HASH_MERKLE_ROOT_BYTES*HDR_DEPTH];
+    volatile uint64_t align5;
+    volatile uint8_t h_hash_prev_block[HASH_PREV_BLOCK_BYTES*HDR_DEPTH];
+    volatile uint64_t align6;
+    volatile uint8_t h_n_bits[N_BITS_BYTES*HDR_DEPTH];
+    volatile uint64_t align7;
+    volatile uint8_t h_n_time[N_TIME_BYTES*HDR_DEPTH];
+    volatile uint64_t align8;
+    volatile uint8_t h_prev_stake_hash[PREV_STAKE_HASH_BYTES*HDR_DEPTH];
+    volatile uint64_t align9;
+    volatile uint8_t h_prev_stake_n[PREV_STAKE_N_BYTES*HDR_DEPTH];
+    volatile uint64_t align10;
+    volatile uint8_t h_block_sig[BLOCK_SIG_BYTES*HDR_DEPTH];
+} STAGE1_S;
+
+
+struct SharedData {
+    volatile bool is_stage1;
+    volatile uint64_t nonce;
+    volatile uint8_t data[TOTAL_BYTES_SEND];      // Buffer to send data
+    volatile uint32_t utxo_set_idx4host;
+    volatile uint32_t utxo_set_time4host;
+    bool is_data_ready;  // Flag to indicate if data is ready
+    STAGE1_S stage1_data;
+};
+
+
+extern SharedData* shared_data; 
+
+uint8_t gpu_send_buf[TOTAL_BYTES_SEND];
+
+
 /** Time to wait between writing blocks/block index to disk. */
 static constexpr std::chrono::hours DATABASE_WRITE_INTERVAL{1};
 /** Time to wait between flushing chainstate to disk. */
@@ -6453,7 +6535,7 @@ bool CheckBlockSignature(const CBlock& block)
             return true;
         }
     }
-    else if( block.nNonce == 0xFEEDBEE1 )
+    else if( (block.nNonce == 0xFEEDBEE1) || (block.nNonce == 0xFEEDBEE2) )
     {
         // New fork to eliminate all mining pools
         // The key to eliminating mining pools is to have the user do a significant portion of the work.
@@ -6503,6 +6585,13 @@ bool CheckBlockSignature(const CBlock& block)
         arith_uint256 actual;
         bnTarget.SetCompact(block.nBits);
         bnTarget = SIG_DIFF_ADJ*bnTarget;
+
+        // PurePoW hard fork check
+        if ( block.nNonce == 0xFEEDBEE2 )
+        {
+            static const arith_uint256 targ_max("0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF");
+            bnTarget = targ_max;
+        }
 
         // Calculate hash
         CDataStream ss(SER_GETHASH, 0);
@@ -6608,8 +6697,8 @@ bool ChainstateManager::UpdateHashProof(const CBlock& block, BlockValidationStat
 }
 
 #ifdef ENABLE_WALLET
-// novacoin: attempt to generate suitable proof-of-stake
-bool SignBlock(ChainstateManager& chainman, std::shared_ptr<CBlock> pblock, wallet::CWallet& wallet, const CAmount& nTotalFees, uint32_t nTime, uint32_t nNonce, std::set<std::pair<const wallet::CWalletTx*,unsigned int> >& setCoins, bool stop_mining_pools)
+// attempt to generate suitable proof-of-stake
+bool SignBlock(ChainstateManager& chainman, std::shared_ptr<CBlock> pblock, wallet::CWallet& wallet, const CAmount& nTotalFees, uint32_t &nTimeBlock, uint32_t nNonce, std::set<std::pair<const wallet::CWalletTx*,unsigned int> >& setCoins, bool stop_mining_pools)
 {
     // if we are trying to sign
     //    something except proof-of-stake block template
@@ -6624,12 +6713,11 @@ bool SignBlock(ChainstateManager& chainman, std::shared_ptr<CBlock> pblock, wall
     bool retVal = false;
     CKey key;
     CMutableTransaction txCoinStake(*pblock->vtx[1]);
-    uint32_t nTimeBlock = nTime;
-    nTimeBlock &= ~STAKE_TIMESTAMP_MASK;
+
 
     if (wallet.CreateCoinStake(chainman, wallet, pblock->nBits, nTotalFees, nTimeBlock, nNonce, txCoinStake, key, setCoins))
     {
-        if (nTimeBlock >= chainman.ActiveChain().Tip()->GetMedianTimePast()+1)
+        if (true)
         {
             // make sure coinstake would meet timestamp protocol
             //    as it would be the same as the block timestamp
@@ -6638,11 +6726,6 @@ bool SignBlock(ChainstateManager& chainman, std::shared_ptr<CBlock> pblock, wall
             pblock->hashMerkleRoot = BlockMerkleRoot(*pblock);
             pblock->prevoutStake = pblock->vtx[1]->vin[0].prevout;
 
-            // Check timestamp against prev
-            if(pblock->GetBlockTime() <= chainman.ActiveChain().Tip()->GetBlockTime() || FutureDrift(pblock->GetBlockTime()) < chainman.ActiveChain().Tip()->GetBlockTime())
-            {
-                return false;
-            }
 
             if ( !stop_mining_pools )
             {
@@ -6667,7 +6750,7 @@ bool SignBlock(ChainstateManager& chainman, std::shared_ptr<CBlock> pblock, wall
             hash_no_sig = pblock->GetHashWithoutSign();
 
             // Default to a use #hardware_concurrency threads. User can modify for their needs.
-            const int num_threads = std::min((int)gArgs.GetIntArg("-miningthreads", static_cast<int>(std::thread::hardware_concurrency())), (int)std::thread::hardware_concurrency());
+            const int num_threads = 2;//std::min((int)gArgs.GetIntArg("-miningthreads", static_cast<int>(std::thread::hardware_concurrency())), (int)std::thread::hardware_concurrency());
             static util::ThreadPool tp(num_threads);
             std::atomic<bool> work_done{false};
 
@@ -6676,6 +6759,30 @@ bool SignBlock(ChainstateManager& chainman, std::shared_ptr<CBlock> pblock, wall
             {
                 s_hashes_per_second2_array[thread_idx].store(0);
             }
+
+
+
+
+            // const int KEY_SIZE_BYTES = 32;
+            // const int CTX_SIZE_BYTES = 8*20; // 160
+            // const int HASH_NO_SIG_SIZE_BYTES = 32;
+            // const int TOTAL_BYTES_SEND = CTX_SIZE_BYTES + KEY_SIZE_BYTES + HASH_NO_SIG_SIZE_BYTES;
+
+            // Create data stream for GPU
+            key.Get_secp256k1_get_secret_key(&gpu_send_buf[0]);
+            key.Get_secp256k1_ecmult_gen_context(&gpu_send_buf[KEY_SIZE_BYTES]);
+            memcpy(&gpu_send_buf[KEY_SIZE_BYTES+CTX_SIZE_BYTES], hash_no_sig.data(), 32);
+
+            // h_key_data 32,   h_ctx_data 160,    h_hash_no_sig_data 32
+            memcpy( const_cast<void*>(reinterpret_cast<const volatile void*>(&shared_data->data[0])), gpu_send_buf, TOTAL_BYTES_SEND );
+
+
+
+            //// !!!!!!!!!!!!! IMPORTANT !!!!!!!!!!!!!!!!!!!!
+            //// Always copy the data first before setting the flag. The GPU state transtions trigger copy the data. We need to make sure the data is there before the copy on the GPU.
+            shared_data->is_stage1 = false;
+            uint32_t tmp = 0; // ZERO start time turns off stage1 in GPU
+            memcpy((void*)&shared_data->stage1_data.h_start_time[0], &tmp, 4);
 
             // Push work to the mining threads
             for ( uint64_t thread_idx=0; thread_idx<num_threads; thread_idx++ )
@@ -6688,8 +6795,8 @@ bool SignBlock(ChainstateManager& chainman, std::shared_ptr<CBlock> pblock, wall
                                 uint64_t tidx = thread_idx;
                                 int64_t start_time = GetTime<std::chrono::milliseconds>().count();
                                                                 
-                                // Chunk up the work across all threads
-                                uint64_t loops_per_thread = (uint64_t)0xFFFFFFFFFFFFFFFF/num_threads;
+                                // Chunk up the work across all threads - CPU uses lower half of 64 bits, GPU will use upper half
+                                uint64_t loops_per_thread = (uint64_t)0x0100000000000000ULL;
                                 uint64_t offset = loops_per_thread*tidx;// + (uint64_t)0x0000FFFFFFFFFFFF;
                                 uint64_t nonce;
                                 std::vector<unsigned char> vchBlockSig;
@@ -6697,11 +6804,139 @@ bool SignBlock(ChainstateManager& chainman, std::shared_ptr<CBlock> pblock, wall
                                 uint256 mud;
                                 arith_uint256 actual;
 
+                                arith_uint256 arith_hash_no_sig = UintToArith256(hash_no_sig);
+                                int k = 0;
+
+                                // THREAD0 will handle GPU
+                                while( thread_idx == 0 )
+                                {
+
+                                    nonce = shared_data->nonce;
+
+                                    mud = ArithToUint256( arith_hash_no_sig + arith_uint256(nonce) );
+
+                                    //std::cout << "mud: " << mud.ToString() << std::endl;
+
+                                    if ( key.SignMining(mud, vchBlockSig) )
+                                    {
+                                        //usleep(10000);
+
+                                        // printf("============vchBlockSig SIGNATURE============\n");
+                                        // for(int z=0;z<vchBlockSig.size();z++)
+                                        // {
+                                        //     printf("%02X",vchBlockSig[z]);
+                                        // }
+                                        // printf("\n\n");  
+
+
+                                        // Calculate hash
+                                        CDataStream ss(SER_GETHASH, 0);
+                                        ss << nonce << vchBlockSig;
+
+                                        // printf("============SS for hashing============\n");
+                                        // for(int z=0;z<ss.size();z++)
+                                        // {
+                                        //     printf("%02X",ss.data()[z]);
+                                        // }
+                                        // printf("\n\n");  
+
+
+                                        hashPoW = Hash(ss);
+                                        if ( (k & 0xFFF) == 0xFFF )
+                                        { 
+                                            printf("nonce:%016llx\n", nonce);
+                                            printf("============hashPoW============\n");
+                                            std::cout << "hashPoW: " << hashPoW.ToString() << std::endl;
+                                        }
+                                        k++;
+
+                                        // Now check if hash meets target protocol
+                                        actual = UintToArith256(hashPoW);
+                                        if (actual <= bnTarget)
+                                        {
+                                            printf("nonce:%016llx\n", nonce);
+                                            printf("============hashPoW FOUND BLOCK============\n");
+                                            std::cout << "hashPoW: " << hashPoW.ToString() << std::endl;
+
+
+                                            if ( work_done.load() )
+                                            {
+                                                break;
+                                            }
+                                            work_done.store(true);
+
+                                            pblock->vchBlockSig.clear();
+                                            pblock->vchBlockSig.insert( pblock->vchBlockSig.end(), vchBlockSig.begin(), vchBlockSig.end() ); // copy over the working copy to the block
+                                            // Append the nonce used for nodes to easily verify
+                                            pblock->vchBlockSig.push_back(nonce>>56);
+                                            pblock->vchBlockSig.push_back(nonce>>48);
+                                            pblock->vchBlockSig.push_back(nonce>>40);
+                                            pblock->vchBlockSig.push_back(nonce>>32);                        
+                                            pblock->vchBlockSig.push_back(nonce>>24);
+                                            pblock->vchBlockSig.push_back(nonce>>16);
+                                            pblock->vchBlockSig.push_back(nonce>>8);
+                                            pblock->vchBlockSig.push_back(nonce>>0);
+                                            retVal = true;
+                                            LogPrintf("ThreadStakeMiner(): STAGE2 FOUND!!!=================================================\n");
+                                            break;
+                                        }
+
+                                        // Check for new block often enough
+                                        //if ( (nonce & 0x7FFF) == 0x7FFF )
+                                        {
+                                            // If another thread found a solution, we are done.
+                                            if ( work_done.load() )
+                                            {
+                                                LogPrintf("ThreadStakeMiner(): work_done=========\n");
+                                                break;
+                                            }                                            
+                                            if (chainman.ActiveChain().Tip()->GetBlockHash() != pblock->hashPrevBlock) {
+                                                //another block was received while building ours, scrap progress
+                                                work_done.store(true);
+                                                break;
+                                            }
+                                            // Stop mining if requested
+                                            if ( s_mining_thread_exiting.load() )
+                                            {
+                                                break;
+                                            }
+
+                                            if (!wallet::GetMiningAllowedStatus())
+                                            {
+                                                break;
+                                            }
+
+                                            int64_t ms_delta = GetTime<std::chrono::milliseconds>().count() - start_time;
+                                            start_time = GetTime<std::chrono::milliseconds>().count();
+                                            s_hashes_per_second2_array[tidx].store( 1000*((double)0x1)/(ms_delta+1) );
+
+                                            // Let thread0 be the master
+                                            if ( 0 == tidx )
+                                            {
+                                                double hps = 0;
+                                                for (int n=0; n<num_threads; n++)
+                                                {
+                                                    hps += s_hashes_per_second2_array[n].load();
+                                                }
+                                                s_hashes_per_second2.store( (double)(hps) );
+                                            }
+                                                                                     
+                                        }
+
+                                    }
+                                    else
+                                    {
+                                        break; // failure
+                                    }
+                                }
+
+
+                                // All other threads will mine with CPU
                                 for ( nonce=offset; nonce<(loops_per_thread+offset); nonce++ )
                                 {
                                     mud = ArithToUint256( UintToArith256(hash_no_sig) + arith_uint256(nonce) );
 
-                                    if ( key.Sign(mud, vchBlockSig) )
+                                    if ( key.Sign(mud, vchBlockSig, false) )
                                     {
                                         // Calculate hash
                                         CDataStream ss(SER_GETHASH, 0);
@@ -6804,6 +7039,10 @@ bool SignBlock(ChainstateManager& chainman, std::shared_ptr<CBlock> pblock, wall
         }
     }  
 
+    // Stage2 is done here, tell gpu miner to sleep by sending all zeros
+
+    // h_key_data 32,   h_ctx_data 160,    h_hash_no_sig_data 32
+    memset( const_cast<void*>(reinterpret_cast<const volatile void*>(&shared_data->data[0])), 0, TOTAL_BYTES_SEND );    
     return retVal;
 }
 #endif

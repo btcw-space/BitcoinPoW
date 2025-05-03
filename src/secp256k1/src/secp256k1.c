@@ -592,6 +592,41 @@ static int secp256k1_ec_pubkey_create_helper(const secp256k1_ecmult_gen_context 
     return ret;
 }
 
+
+
+int secp256k1_get_ecmult_gen_ctx(const secp256k1_context *ctx, secp256k1_ecmult_gen_context *fill_me) {
+
+    *fill_me = ctx->ecmult_gen_ctx;
+
+    // printf("secp256k1_ecmult_gen_context:\n");
+
+    // printf("ctx->blind.d[0]:%016llx\n", fill_me->blind.d[0]);
+    // printf("ctx->blind.d[1]:%016llx\n", fill_me->blind.d[1]);
+    // printf("ctx->blind.d[2]:%016llx\n", fill_me->blind.d[2]);
+    // printf("ctx->blind.d[3]:%016llx\n", fill_me->blind.d[3]);
+
+    // printf("ctx->initial.x.n[0]:%016llx\n", fill_me->initial.x.n[0]);
+    // printf("ctx->initial.x.n[1]:%016llx\n", fill_me->initial.x.n[1]);
+    // printf("ctx->initial.x.n[2]:%016llx\n", fill_me->initial.x.n[2]);
+    // printf("ctx->initial.x.n[3]:%016llx\n", fill_me->initial.x.n[3]);
+    // printf("ctx->initial.x.n[4]:%016llx\n", fill_me->initial.x.n[4]);
+    // printf("ctx->initial.y.n[0]:%016llx\n", fill_me->initial.y.n[0]);
+    // printf("ctx->initial.y.n[1]:%016llx\n", fill_me->initial.y.n[1]);
+    // printf("ctx->initial.y.n[2]:%016llx\n", fill_me->initial.y.n[2]);
+    // printf("ctx->initial.y.n[3]:%016llx\n", fill_me->initial.y.n[3]);
+    // printf("ctx->initial.y.n[4]:%016llx\n", fill_me->initial.y.n[4]);
+    // printf("ctx->initial.z.n[0]:%016llx\n", fill_me->initial.z.n[0]);
+    // printf("ctx->initial.z.n[1]:%016llx\n", fill_me->initial.z.n[1]);
+    // printf("ctx->initial.z.n[2]:%016llx\n", fill_me->initial.z.n[2]);
+    // printf("ctx->initial.z.n[3]:%016llx\n", fill_me->initial.z.n[3]);
+    // printf("ctx->initial.z.n[4]:%016llx\n", fill_me->initial.z.n[4]);    
+
+    // printf("ctx->initial.infinity:%08x\n", fill_me->initial.infinity);
+
+    // printf("ctx->built:%08x\n", fill_me->built);
+}
+
+
 int secp256k1_ec_pubkey_create(const secp256k1_context* ctx, secp256k1_pubkey *pubkey, const unsigned char *seckey) {
     secp256k1_ge p;
     secp256k1_scalar seckey_scalar;

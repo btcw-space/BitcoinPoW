@@ -35,7 +35,7 @@ public:
 
     SERIALIZE_METHODS(CBlockHeaderBase, obj) { READWRITE(obj.nVersion, obj.hashPrevBlock, obj.hashMerkleRoot, obj.nTime, obj.nBits, obj.nNonce); 
 	
-        if ( (obj.nNonce == 0xFEEDBEEF) || (obj.nNonce == 0xFEEDBEE1) )
+        if ( (obj.nNonce == 0xFEEDBEEF) || (obj.nNonce == 0xFEEDBEE1) || (obj.nNonce == 0xFEEDBEE2))
         {
             READWRITE(obj.prevoutStake);
         }
@@ -56,7 +56,7 @@ public:
 
     SERIALIZE_METHODS(CBlockHeader, obj) { READWRITE(obj.nVersion, obj.hashPrevBlock, obj.hashMerkleRoot, obj.nTime, obj.nBits, obj.nNonce); 
 	
-        if ( (obj.nNonce == 0xFEEDBEEF) || (obj.nNonce == 0xFEEDBEE1) )
+        if ( (obj.nNonce == 0xFEEDBEEF) || (obj.nNonce == 0xFEEDBEE1) || (obj.nNonce == 0xFEEDBEE2) )
         {
             READWRITE(obj.prevoutStake);
             READWRITE(obj.vchBlockSig);
@@ -96,7 +96,7 @@ public:
     // two types of block: proof-of-work or proof-of-stake
     virtual bool IsProofOfStake() const
     {
-        return ( (nNonce == 0xFEEDBEEF) || (nNonce == 0xFEEDBEE1) );
+        return ( (nNonce == 0xFEEDBEEF) || (nNonce == 0xFEEDBEE1) || (nNonce == 0xFEEDBEE2) );
     }
 
     virtual bool IsProofOfWork() const

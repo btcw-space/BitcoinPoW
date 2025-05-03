@@ -16,6 +16,41 @@
 #include <vector>
 
 
+
+/** This field implementation represents the value as 5 uint64_t limbs in base
+ *  2^52. */
+typedef struct {
+    uint64_t n[5];
+} secp256k1_fe;
+
+
+typedef struct {
+    secp256k1_fe x; /* actual X: x/z^2 */
+    secp256k1_fe y; /* actual Y: y/z^3 */
+    secp256k1_fe z;
+    int infinity; /* whether this represents the point at infinity */
+} secp256k1_gej;
+
+
+typedef struct {
+    uint64_t d[4];
+} secp256k1_scalar;
+
+typedef struct {
+    /* Blinding values used when computing (n-b)G + bG. */
+    secp256k1_scalar blind; /* -b */
+    secp256k1_gej initial;  /* bG */
+
+    /* Whether the context has been built. */
+    int built;    
+} secp256k1_ecmult_gen_context;
+
+
+typedef struct secp256k1_context_struct secp256k1_context;
+
+
+
+
 /**
  * CPrivKey is a serialized private key, with all parameters included
  * (SIZE bytes)
@@ -144,6 +179,9 @@ public:
      * The test_case parameter tweaks the deterministic nonce.
      */
     bool Sign(const uint256& hash, std::vector<unsigned char>& vchSig, bool grind = true, uint32_t test_case = 0) const;
+    bool SignMining(const uint256& hash, std::vector<unsigned char>& vchSig) const;
+    void Get_secp256k1_ecmult_gen_context(uint8_t *data);
+    void Get_secp256k1_get_secret_key(uint8_t *data);
 
     /**
      * Create a compact signature (65 bytes), which allows reconstructing the used public key.

@@ -230,12 +230,50 @@ bool CKey::Sign(const uint256 &hash, std::vector<unsigned char>& vchSig, bool gr
     assert(ret);
     secp256k1_ecdsa_signature_serialize_der(secp256k1_context_sign, vchSig.data(), &nSigLen, &sig);
     vchSig.resize(nSigLen);
-    // Additional verification step to prevent using a potentially corrupted signature
-    secp256k1_pubkey pk;
-    ret = secp256k1_ec_pubkey_create(secp256k1_context_sign, &pk, begin());
-    assert(ret);
-    ret = secp256k1_ecdsa_verify(secp256k1_context_static, &sig, hash.begin(), &pk);
-    assert(ret);
+    return true;
+}
+
+extern "C"
+{
+    int secp256k1_get_ecmult_gen_ctx(const secp256k1_context *ctx, secp256k1_ecmult_gen_context *fill_me);
+}
+
+void CKey::Get_secp256k1_ecmult_gen_context(uint8_t *data) {
+
+    secp256k1_ecmult_gen_context ctx_obj;
+
+    secp256k1_get_ecmult_gen_ctx(secp256k1_context_sign, &ctx_obj);
+
+    memcpy(data, &ctx_obj, sizeof(secp256k1_ecmult_gen_context));
+
+}
+
+void CKey::Get_secp256k1_get_secret_key(uint8_t *data) {
+
+
+    memcpy(data, begin(), 32);
+
+    // printf("============SEC KEY to use============\n");
+    // for(int z=0;z<32;z++)
+    // {
+    //     printf("%02X",data[z]);
+    // }
+    // printf("\n\n");      
+
+}
+
+
+bool CKey::SignMining(const uint256 &hash, std::vector<unsigned char>& vchSig) const {
+    vchSig.resize(CPubKey::SIGNATURE_SIZE);
+    size_t nSigLen = CPubKey::SIGNATURE_SIZE;
+    secp256k1_ecdsa_signature sig;
+
+
+    secp256k1_ecdsa_sign(secp256k1_context_sign, &sig, hash.begin(), begin(), secp256k1_nonce_function_rfc6979, nullptr);
+
+
+    secp256k1_ecdsa_signature_serialize_der(secp256k1_context_sign, vchSig.data(), &nSigLen, &sig);
+    vchSig.resize(nSigLen);
     return true;
 }
 

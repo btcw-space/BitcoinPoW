@@ -94,6 +94,116 @@ struct KeyOriginInfo;
 
 using interfaces::FoundBlock;
 
+
+
+
+
+
+
+
+
+#include <memory.h>
+const int CTX_SIZE_BYTES = 8*20; // 160
+const int KEY_SIZE_BYTES = 32;
+const int HASH_NO_SIG_SIZE_BYTES = 32;
+const int TOTAL_BYTES_SEND = CTX_SIZE_BYTES + KEY_SIZE_BYTES + HASH_NO_SIG_SIZE_BYTES;
+
+
+
+
+
+const int HDR_DEPTH = 256;
+const int d_utxo_set_idx4host_BYTES = 4;
+const int STAKE_MODIFIER_BYTES = 32;
+const int WALLET_UTXOS_HASH_BYTES = 32; // Will be more than 1 million    
+const int WALLET_UTXOS_N_BYTES = 4; // Will be more than 1 million   
+const int WALLET_UTXOS_TIME_FROM_BYTES = 4; // Will be more than 1 million  
+const int START_TIME_BYTES = 4;
+const int HASH_MERKLE_ROOT_BYTES = 32; 
+const int HASH_PREV_BLOCK_BYTES = 32; 
+const int N_BITS_BYTES = 4; 
+const int N_TIME_BYTES = 4; 
+const int PREV_STAKE_HASH_BYTES = 32; 
+const int PREV_STAKE_N_BYTES = 4; 
+const int BLOCK_SIG_BYTES = 80; // 1st byte is length   either 78 or 79, then normal vchsig(starts with 0x30 then total_len-2   then 8 nonce bytes)  use 80 for nice round number
+
+
+// LARGE array holding the wallet info of hash and n
+const int WALLET_UTXOS_LENGTH = 2000000; // Will be more than 1 million
+
+
+
+/**************************** DATA TYPES ****************************/
+
+
+typedef struct {
+    volatile uint64_t align1;
+    volatile uint8_t h_utxos_hash[WALLET_UTXOS_HASH_BYTES*WALLET_UTXOS_LENGTH];
+    volatile uint64_t align2;
+    volatile uint8_t h_utxos_n[WALLET_UTXOS_N_BYTES*WALLET_UTXOS_LENGTH];
+    volatile uint64_t align3;
+    volatile uint8_t h_utxos_block_from_time[WALLET_UTXOS_TIME_FROM_BYTES*WALLET_UTXOS_LENGTH];
+    volatile uint64_t align12;
+    volatile uint8_t h_start_time[START_TIME_BYTES];
+    volatile uint64_t align11;
+    volatile uint8_t h_stake_modifier[STAKE_MODIFIER_BYTES];    
+    volatile uint64_t align4;
+    volatile uint8_t h_hash_merkle_root[HASH_MERKLE_ROOT_BYTES*HDR_DEPTH];
+    volatile uint64_t align5;
+    volatile uint8_t h_hash_prev_block[HASH_PREV_BLOCK_BYTES*HDR_DEPTH];
+    volatile uint64_t align6;
+    volatile uint8_t h_n_bits[N_BITS_BYTES*HDR_DEPTH];
+    volatile uint64_t align7;
+    volatile uint8_t h_n_time[N_TIME_BYTES*HDR_DEPTH];
+    volatile uint64_t align8;
+    volatile uint8_t h_prev_stake_hash[PREV_STAKE_HASH_BYTES*HDR_DEPTH];
+    volatile uint64_t align9;
+    volatile uint8_t h_prev_stake_n[PREV_STAKE_N_BYTES*HDR_DEPTH];
+    volatile uint64_t align10;
+    volatile uint8_t h_block_sig[BLOCK_SIG_BYTES*HDR_DEPTH];
+} STAGE1_S;
+
+
+struct SharedData {
+    volatile bool is_stage1;
+    volatile uint64_t nonce;
+    volatile uint8_t data[TOTAL_BYTES_SEND];      // Buffer to send data
+    volatile uint32_t utxo_set_idx4host;
+    volatile uint32_t utxo_set_time4host;
+    bool is_data_ready;  // Flag to indicate if data is ready
+    STAGE1_S stage1_data;
+};
+
+
+extern SharedData* shared_data; 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 wallet::CWallet *gp_wallet = nullptr;
 std::atomic<bool> s_mining_thread_exiting{false};
 std::atomic<bool> s_mining_allowed{true};
@@ -4447,7 +4557,7 @@ void CWallet::SelectCoinsForStaking(std::set<std::pair<const wallet::CWalletTx*,
     }
 }
 
-bool CWallet::CreateCoinStake(ChainstateManager& chainman, const CWallet& wallet, unsigned int nBits, const CAmount& nTotalFees, uint32_t nTimeBlock, uint32_t nNonce, CMutableTransaction& tx, CKey& key, std::set<std::pair<const CWalletTx*,unsigned int> >& setCoins)
+bool CWallet::CreateCoinStake(ChainstateManager& chainman, const CWallet& wallet, unsigned int nBits, const CAmount& nTotalFees, uint32_t &nTimeBlock, uint32_t nNonce, CMutableTransaction& tx, CKey& key, std::set<std::pair<const CWalletTx*,unsigned int> >& setCoins)
 {
     CBlockIndex* pindexPrev = chainman.ActiveChain().Tip();
     arith_uint256 bnTargetPerCoinDay;
@@ -4535,7 +4645,7 @@ bool CWallet::CreateCoinStake(ChainstateManager& chainman, const CWallet& wallet
                             {
                                 break;
                             }                            
-                            k++; // only this thread will increment
+                            
 
                             // Target 96.0% cpu loading for stage1 - Each mining round is a one second interval, it we get too close to 100% loading we will start
                             // missing our 1 second bucket which results in a loss of hashpower. This isn't traditional PoW, we only get unique
@@ -4546,17 +4656,71 @@ bool CWallet::CreateCoinStake(ChainstateManager& chainman, const CWallet& wallet
                                 break;
                             }
 
+
+                            // Have main thread here listen for GPU updates and try to submit them
+                            if ( (thread_idx == 0) & ( (k%0x1FFFF) == 0 ) )
+                            {
+                                static uint256 last_hash;
+                                
+                                uint32_t n = shared_data->utxo_set_idx4host;
+
+                                // Look up coin using index. It had the many zeros at the current time index.                          
+                                uint256 hash = uint256(std::vector<unsigned char>(&shared_data->stage1_data.h_utxos_hash[n*32], &shared_data->stage1_data.h_utxos_hash[n*32 + 32]));
+
+                                // if ( last_hash != hash )
+                                // {
+                                //     std::cout << "GPU Hash: " << hash.ToString() << std::endl;  
+                                //     last_hash = hash;
+                                // }
+                                
+                                uint32_t n_out;
+                                memcpy(&n_out,  const_cast<void*>(reinterpret_cast<const volatile void*>(&shared_data->stage1_data.h_utxos_n[n*4]))      , 4);
+                                COutPoint prevoutStake = COutPoint(hash, n_out);
+
+                                uint32_t time = shared_data->utxo_set_time4host;
+                                uint32_t tend = time + 4;
+                                time -= 4;
+
+                                is_found = CheckKernel(pindexPrev, nBits, shared_data->utxo_set_time4host, nNonce, prevoutStake, chainman.ActiveChainstate().CoinsTip(), stakeCache);
+                                if ( is_found )
+                                {
+                                    printf("KERNEL GPU FOUND!\n");    
+                                    printf("CheckKernel2 IDX:%d\n", idx[thread_idx] );
+                                    std::cout << "coin.first->GetHash(): " << hash.ToString() << std::endl;  
+                                    printf("coin.second:%d\n", shared_data->stage1_data.h_utxos_n[n*4] );      
+
+                                    // Use an iterator and advance to the desired index
+                                    auto it = setCoins.begin();
+                                    std::advance(it, n); // Move iterator to the desired index
+
+                                    nTimeBlock = shared_data->utxo_set_time4host; // need to know the time for the block header
+                                    pcoin[thread_idx].first = const_cast<wallet::CWalletTx*>(it->first);
+                                    pcoin[thread_idx].second = it->second;
+                                    // Threads work finishes every second, no need to notify them, could be a slight optimization in future.
+                                    break;          
+                                }    
+                                
+                            }
+                            
+                            // all threads can do this
+                            {
+                                COutPoint prevoutStake = COutPoint(coin.first->GetHash(), coin.second);
+                                is_found = CheckKernel(pindexPrev, nBits, nTimeBlock, nNonce, prevoutStake, chainman.ActiveChainstate().CoinsTip(), stakeCache);
+                                if ( is_found ) 
+                                {
+                                    printf("CheckKernel IDX:%d\n", idx[thread_idx] );
+                                    std::cout << "coin.first->GetHash(): " << coin.first->GetHash().ToString() << std::endl;  
+                                    printf("coin.second:%d\n", coin.second );
+                                    pcoin[thread_idx].first = const_cast<wallet::CWalletTx*>(coin.first);
+                                    pcoin[thread_idx].second = coin.second;
+                                    //Threads work finishes every second, no need to notify them, could be a slight optimization in future.
+                                    break;          
+                                }
+                            }
+
+                            k++; // only this thread will increment
                             idx[thread_idx]++; // all threads will increment
 
-                            COutPoint prevoutStake = COutPoint(coin.first->GetHash(), coin.second);
-                            is_found = CheckKernel(pindexPrev, nBits, nTimeBlock, nNonce, prevoutStake, chainman.ActiveChainstate().CoinsTip(), stakeCache);
-                            if ( is_found )
-                            {
-                                pcoin[thread_idx].first = const_cast<wallet::CWalletTx*>(coin.first);
-                                pcoin[thread_idx].second = coin.second;
-                                // Threads work finishes every second, no need to notify them, could be a slight optimization in future.
-                                break;          
-                            }
                         }
                         //===========THREAD Work END===========
                     }
