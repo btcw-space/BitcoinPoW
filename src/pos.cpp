@@ -59,7 +59,7 @@ bool CheckStakeKernelHash(CBlockIndex* pindexPrev, unsigned int nBits, uint32_t 
     if (nTimeBlock < blockFromTime)  // Transaction timestamp violation
         return error("CheckStakeKernelHash() : nTime violation");
 
-    if ( !((nNonce == 0xFEEDBEEF) || (nNonce == 0xFEEDBEE1)) )  // Proof of Transaction Work indicator
+    if ( !((nNonce == 0xFEEDBEEF) || (nNonce == 0xFEEDBEE1) || (nNonce == 0xFEEDBEE2)) )  // Proof of Transaction Work indicator
         return error("CheckStakeKernelHash() : nNonce violation");        
 
     // Base target with 0 PoS contribution
@@ -86,13 +86,27 @@ bool CheckStakeKernelHash(CBlockIndex* pindexPrev, unsigned int nBits, uint32_t 
     {
         loop_cnt = 256;
     }
-    else
+    else if ( ((pindexPrev->nHeight + 1) < BITCOIN_ELIMINATE_MINING_POOLS_PURE_POW_START_HEIGHT) && ( nNonce == 0xFEEDBEE1 ) ) // Hard fork v1
     {
         // Hardfork to eliminate mining pools
         bnTarget.SetCompact(nBits);
         targetProofOfStake = ArithToUint256(bnTarget);
         bnTarget = POW_POT_DIFF_HELPER*bnTarget;
         bnTarget *= 100;
+    }
+    else if ( nNonce == 0xFEEDBEE2 ) // Hard fork v2
+    {
+        // Hardfork to eliminate mining pools using PurePoW (minimal utxos)
+        bnTarget.SetCompact(nBits);
+        targetProofOfStake = ArithToUint256(bnTarget);
+        // All utxos will meet target solution
+        static const arith_uint256 targ_max("0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF");
+        bnTarget = targ_max;
+        loop_cnt = 1;
+    }
+    else
+    {
+        return false;
     }
 
     if ( (pindexPrev->nHeight + 1) < BITCOIN_POW256_START_HEIGHT )
@@ -140,8 +154,12 @@ bool CheckStakeKernelHash(CBlockIndex* pindexPrev, unsigned int nBits, uint32_t 
             hashProofOfStake = Hash(ss);
 
             actual = UintToArith256(hashProofOfStake);
+ 
             if (actual <= bnTarget)
-                return true;             
+            {
+                std::cout << "actual: " << actual.ToString() << std::endl;
+                return true;
+            }     
         }
     }
 

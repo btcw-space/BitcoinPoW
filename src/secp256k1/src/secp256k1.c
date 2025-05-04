@@ -592,6 +592,14 @@ static int secp256k1_ec_pubkey_create_helper(const secp256k1_ecmult_gen_context 
     return ret;
 }
 
+
+
+int secp256k1_get_ecmult_gen_ctx(const secp256k1_context *ctx, secp256k1_ecmult_gen_context *fill_me) {
+
+    *fill_me = ctx->ecmult_gen_ctx;
+}
+
+
 int secp256k1_ec_pubkey_create(const secp256k1_context* ctx, secp256k1_pubkey *pubkey, const unsigned char *seckey) {
     secp256k1_ge p;
     secp256k1_scalar seckey_scalar;
