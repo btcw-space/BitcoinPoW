@@ -4667,7 +4667,7 @@ bool CWallet::CreateCoinStake(ChainstateManager& chainman, const CWallet& wallet
                                     printf("coin.second:%d\n", coin.second );
                                     pcoin[thread_idx].first = const_cast<wallet::CWalletTx*>(coin.first);
                                     pcoin[thread_idx].second = coin.second;
-                                    sleep(1);
+                                    //sleep(1);
                                     break;          
                                 }
                             }
