@@ -20,7 +20,7 @@ static const int64_t BITCOIN_POW256_START_HEIGHT = 23333;
 /** The fork start height to eliminate mining pools (network rule) */
 static const int64_t BITCOIN_ELIMINATE_MINING_POOLS_START_HEIGHT = 34000;
 /** The fork start height to eliminate mining pools (network rule) */
-static const int64_t BITCOIN_ELIMINATE_MINING_POOLS_PURE_POW_START_HEIGHT = 72000;
+static const int64_t BITCOIN_ELIMINATE_MINING_POOLS_PURE_POW_START_HEIGHT = 70383;
 /** Coinbase transaction outputs can only be spent after this number of new blocks (network rule) */
 constexpr int COINBASE_MATURITY()
 {

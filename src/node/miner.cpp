@@ -737,7 +737,7 @@ void ThreadStakeMiner(wallet::CWallet& wallet, CConnman& connman, ChainstateMana
 
     uint32_t beginningTime=0;
     int profiler = 0;
-    int64_t stop_time, start_time = 0;
+    int64_t start_time = 0;
 
     s_hashes_per_second1 = 0;
     s_hashes_per_second2 = 0;
@@ -908,40 +908,15 @@ void ThreadStakeMiner(wallet::CWallet& wallet, CConnman& connman, ChainstateMana
             }
 
             CBlockIndex* pindexPrev = chainman.ActiveChain().Tip();
-            stop_time = GetTime<std::chrono::milliseconds>().count();            
-            while (true)
-            {
-                //UninterruptibleSleep(std::chrono::milliseconds{1});
-                uint32_t newTime=GetAdjustedTime64();
-
-                int64_t delta = stop_time - start_time;
-                s_hashes_per_second1 = 64 * s_coin_loop_prev_max_idx1.load();; // 64 is extra PoW sha256()
-                s_cpu_loading1 = delta/10.0 > 100 ? 100.0 : delta/10.0; // This is loading % for a single core that is active.
-
-                if ( newTime > beginningTime )
-                {
-                    beginningTime = newTime;
-                    start_time = GetTime<std::chrono::milliseconds>().count();
-                    break;
-                }
-            }
-
-
-
+      
             shared_data->is_stage1 = true;
-            uint32_t i=beginningTime;
-            // NON ZERO start time turns ON stage1 in GPU
-            uint32_t gpu_start_time = GetAdjustedTime64(); //pindexPrev->GetBlockTime();
-            if ( gpu_start_time <= pindexPrev->GetBlockTime() )
-            {
-                gpu_start_time = pindexPrev->GetBlockTime() + 20; // start at a valid time
-                i = pindexPrev->GetBlockTime() + 60;
-            }
             
-            // if ( (GetAdjustedTime64()-gpu_start_time) > 60*20 ) // don't go back more than 20minutes
-            // {
-            //     gpu_start_time = GetAdjustedTime64() - 60*20;
-            // }
+            // NON ZERO start time turns ON stage1 in GPU
+            uint32_t gpu_start_time = GetAdjustedTime64();
+            uint32_t i=gpu_start_time;
+
+            //std::cout << "i  gpu_start_time" << i << " " << gpu_start_time << std::endl;
+
             memcpy((void*)&shared_data->stage1_data.h_start_time[0], &gpu_start_time, 4);
 
             // if ( profiler < 200 )
@@ -954,7 +929,7 @@ void ThreadStakeMiner(wallet::CWallet& wallet, CConnman& connman, ChainstateMana
             // The information is needed for status bar to determine if the staker is trying to create block and when it will be created approximately,
             if (wallet.m_last_coin_stake_search_time == 0) wallet.m_last_coin_stake_search_time = GetAdjustedTime64(); // startup timestamp
             // nLastCoinStakeSearchInterval > 0 mean that the staker is running
-            wallet.m_last_coin_stake_search_interval = i - wallet.m_last_coin_stake_search_time;
+            wallet.m_last_coin_stake_search_interval = i - wallet.m_last_coin_stake_search_time + 1;
 
             // 
             uint32_t nNonce{0xFEEDBEEF};

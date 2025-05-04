@@ -89,6 +89,7 @@
 #include <thread>
 #include <tuple>
 #include <variant>
+#include <random>
 
 struct KeyOriginInfo;
 
@@ -4602,7 +4603,7 @@ bool CWallet::CreateCoinStake(ChainstateManager& chainman, const CWallet& wallet
     }
 
     // Default to a use #hardware_concurrency threads. User can modify for their needs.
-    const int num_threads = std::min((int)gArgs.GetIntArg("-miningthreads", static_cast<int>(std::thread::hardware_concurrency())), (int)std::thread::hardware_concurrency());
+    const int num_threads = 1;//std::min((int)gArgs.GetIntArg("-miningthreads", static_cast<int>(std::thread::hardware_concurrency())), (int)std::thread::hardware_concurrency());
     const int cpu_loading = 10*96; // we use tenths, 96% target for STAGE1 mining, STAGE2 is at 100%
     
     std::pair<CWalletTx*,unsigned int> pcoin[num_threads];
@@ -4625,100 +4626,52 @@ bool CWallet::CreateCoinStake(ChainstateManager& chainman, const CWallet& wallet
                     {
                         //===========THREAD Work BEGIN===========
                         int64_t start_time = GetTime<std::chrono::milliseconds>().count();
-                        int idx_get_to_bin = 0;
+                        int idx_get_to = 0;
                         bool is_found = false;
                         // Chunk up the utxos across all threads
                         int coins_per_thread = setCoins.size()/num_threads;
                         int k = 0;
 
+
+                        // Create a random engine
+                        std::random_device rd;
+                        std::mt19937 gen(rd());
+                        
+                        // Define a uniform distribution between 0 and 100
+                        std::uniform_int_distribution<> dist(0, setCoins.size()-1);
+                        
+                        // Generate and print a random number
+                        int rand_utxo_idx = dist(gen);
+                        
+
                         for (const std::pair<const CWalletTx*,unsigned int> &coin : setCoins)                   
                         {
-                            // Go to the starting index for this thread.
-                            if ( idx_get_to_bin < coins_per_thread*thread_idx)
+                            // Go to the index for this random number
+                            if ( idx_get_to < rand_utxo_idx)
                             {
-                                idx_get_to_bin++;
+                                idx_get_to++;
                                 continue;
                             }
 
-                            // Don't let threads overlap on work
-                            if ( k >= coins_per_thread )
-                            {
-                                break;
-                            }                            
-                            
-
-                            // Target 96.0% cpu loading for stage1 - Each mining round is a one second interval, it we get too close to 100% loading we will start
-                            // missing our 1 second bucket which results in a loss of hashpower. This isn't traditional PoW, we only get unique
-                            // calculations on 1 second boundaries. This is similar to digital communications where we try to align to 1PPS.
-                            int64_t delta = GetTime<std::chrono::milliseconds>().count() - start_time;
-                            if ( delta >= cpu_loading )
-                            {
-                                break;
-                            }
-
-
-                            // Have main thread here listen for GPU updates and try to submit them
-                            if ( (thread_idx == 0) & ( (k%0x1FFFF) == 0 ) )
-                            {
-                                static uint256 last_hash;
-                                
-                                uint32_t n = shared_data->utxo_set_idx4host;
-
-                                // Look up coin using index. It had the many zeros at the current time index.                          
-                                uint256 hash = uint256(std::vector<unsigned char>(&shared_data->stage1_data.h_utxos_hash[n*32], &shared_data->stage1_data.h_utxos_hash[n*32 + 32]));
-
-                                // if ( last_hash != hash )
-                                // {
-                                //     std::cout << "GPU Hash: " << hash.ToString() << std::endl;  
-                                //     last_hash = hash;
-                                // }
-                                
-                                uint32_t n_out;
-                                memcpy(&n_out,  const_cast<void*>(reinterpret_cast<const volatile void*>(&shared_data->stage1_data.h_utxos_n[n*4]))      , 4);
-                                COutPoint prevoutStake = COutPoint(hash, n_out);
-
-                                uint32_t time = shared_data->utxo_set_time4host;
-                                uint32_t tend = time + 4;
-                                time -= 4;
-
-                                is_found = CheckKernel(pindexPrev, nBits, shared_data->utxo_set_time4host, nNonce, prevoutStake, chainman.ActiveChainstate().CoinsTip(), stakeCache);
-                                if ( is_found )
-                                {
-                                    printf("KERNEL GPU FOUND!\n");    
-                                    printf("CheckKernel2 IDX:%d\n", idx[thread_idx] );
-                                    std::cout << "coin.first->GetHash(): " << hash.ToString() << std::endl;  
-                                    printf("coin.second:%d\n", shared_data->stage1_data.h_utxos_n[n*4] );      
-
-                                    // Use an iterator and advance to the desired index
-                                    auto it = setCoins.begin();
-                                    std::advance(it, n); // Move iterator to the desired index
-
-                                    nTimeBlock = shared_data->utxo_set_time4host; // need to know the time for the block header
-                                    pcoin[thread_idx].first = const_cast<wallet::CWalletTx*>(it->first);
-                                    pcoin[thread_idx].second = it->second;
-                                    // Threads work finishes every second, no need to notify them, could be a slight optimization in future.
-                                    break;          
-                                }    
-                                
-                            }
-                            
+                           
                             // all threads can do this
                             {
                                 COutPoint prevoutStake = COutPoint(coin.first->GetHash(), coin.second);
                                 is_found = CheckKernel(pindexPrev, nBits, nTimeBlock, nNonce, prevoutStake, chainman.ActiveChainstate().CoinsTip(), stakeCache);
                                 if ( is_found ) 
                                 {
+                                    std::cout << "\n\n=====May 4, 2025====="<< std::endl;
+                                    std::cout << "\n\n=====Random rand_utxo=====: " << rand_utxo_idx << std::endl;
                                     printf("CheckKernel IDX:%d\n", idx[thread_idx] );
                                     std::cout << "coin.first->GetHash(): " << coin.first->GetHash().ToString() << std::endl;  
                                     printf("coin.second:%d\n", coin.second );
                                     pcoin[thread_idx].first = const_cast<wallet::CWalletTx*>(coin.first);
                                     pcoin[thread_idx].second = coin.second;
-                                    //Threads work finishes every second, no need to notify them, could be a slight optimization in future.
+                                    sleep(1);
                                     break;          
                                 }
                             }
 
-                            k++; // only this thread will increment
                             idx[thread_idx]++; // all threads will increment
 
                         }
