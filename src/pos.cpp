@@ -86,15 +86,7 @@ bool CheckStakeKernelHash(CBlockIndex* pindexPrev, unsigned int nBits, uint32_t 
     {
         loop_cnt = 256;
     }
-    else if ( ((pindexPrev->nHeight + 1) < BITCOIN_ELIMINATE_MINING_POOLS_PURE_POW_START_HEIGHT) && ( nNonce == 0xFEEDBEE1 ) ) // Hard fork v1
-    {
-        // Hardfork to eliminate mining pools
-        bnTarget.SetCompact(nBits);
-        targetProofOfStake = ArithToUint256(bnTarget);
-        bnTarget = POW_POT_DIFF_HELPER*bnTarget;
-        bnTarget *= 100;
-    }
-    else if ( nNonce == 0xFEEDBEE2 ) // Hard fork v2
+    else if ( ((pindexPrev->nHeight + 1) > BITCOIN_ELIMINATE_MINING_POOLS_PURE_POW_START_HEIGHT) ) // Hard fork v2
     {
         // Hardfork to eliminate mining pools using PurePoW (minimal utxos)
         bnTarget.SetCompact(nBits);
@@ -103,10 +95,14 @@ bool CheckStakeKernelHash(CBlockIndex* pindexPrev, unsigned int nBits, uint32_t 
         static const arith_uint256 targ_max("0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF");
         bnTarget = targ_max;
         loop_cnt = 1;
-    }
-    else
+    }    
+    else // Hard fork v1
     {
-        return false;
+        // Hardfork to eliminate mining pools
+        bnTarget.SetCompact(nBits);
+        targetProofOfStake = ArithToUint256(bnTarget);
+        bnTarget = POW_POT_DIFF_HELPER*bnTarget;
+        bnTarget *= 100;
     }
 
     if ( (pindexPrev->nHeight + 1) < BITCOIN_POW256_START_HEIGHT )
