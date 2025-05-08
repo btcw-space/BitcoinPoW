@@ -45,75 +45,17 @@ using namespace wallet;
 #include <memory.h>
 
 #define SHM_NAME "/shared_mem"
-#define SEM_EMPTY "/sem_empty"
-#define SEM_FULL "/sem_full"
 
 const int CTX_SIZE_BYTES = 8*20; // 160
 const int KEY_SIZE_BYTES = 32;
 const int HASH_NO_SIG_SIZE_BYTES = 32;
 const int TOTAL_BYTES_SEND = CTX_SIZE_BYTES + KEY_SIZE_BYTES + HASH_NO_SIG_SIZE_BYTES;
 
-
-const int HDR_DEPTH = 256;
-const int d_utxo_set_idx4host_BYTES = 4;
-const int STAKE_MODIFIER_BYTES = 32;
-const int WALLET_UTXOS_HASH_BYTES = 32; // Will be more than 1 million    
-const int WALLET_UTXOS_N_BYTES = 4; // Will be more than 1 million   
-const int WALLET_UTXOS_TIME_FROM_BYTES = 4; // Will be more than 1 million  
-const int START_TIME_BYTES = 4;
-const int HASH_MERKLE_ROOT_BYTES = 32; 
-const int HASH_PREV_BLOCK_BYTES = 32; 
-const int N_BITS_BYTES = 4; 
-const int N_TIME_BYTES = 4; 
-const int PREV_STAKE_HASH_BYTES = 32; 
-const int PREV_STAKE_N_BYTES = 4; 
-const int BLOCK_SIG_BYTES = 80; // 1st byte is length   either 78 or 79, then normal vchsig(starts with 0x30 then total_len-2   then 8 nonce bytes)  use 80 for nice round number
-
-
-// LARGE array holding the wallet info of hash and n
-const int WALLET_UTXOS_LENGTH = 2000000; // Will be more than 1 million
-
-
-
 /**************************** DATA TYPES ****************************/
 
-
-typedef struct {
-    volatile uint64_t align1;
-    volatile uint8_t h_utxos_hash[WALLET_UTXOS_HASH_BYTES*WALLET_UTXOS_LENGTH];
-    volatile uint64_t align2;
-    volatile uint8_t h_utxos_n[WALLET_UTXOS_N_BYTES*WALLET_UTXOS_LENGTH];
-    volatile uint64_t align3;
-    volatile uint8_t h_utxos_block_from_time[WALLET_UTXOS_TIME_FROM_BYTES*WALLET_UTXOS_LENGTH];
-    volatile uint64_t align12;
-    volatile uint8_t h_start_time[START_TIME_BYTES];
-    volatile uint64_t align11;
-    volatile uint8_t h_stake_modifier[STAKE_MODIFIER_BYTES];    
-    volatile uint64_t align4;
-    volatile uint8_t h_hash_merkle_root[HASH_MERKLE_ROOT_BYTES*HDR_DEPTH];
-    volatile uint64_t align5;
-    volatile uint8_t h_hash_prev_block[HASH_PREV_BLOCK_BYTES*HDR_DEPTH];
-    volatile uint64_t align6;
-    volatile uint8_t h_n_bits[N_BITS_BYTES*HDR_DEPTH];
-    volatile uint64_t align7;
-    volatile uint8_t h_n_time[N_TIME_BYTES*HDR_DEPTH];
-    volatile uint64_t align8;
-    volatile uint8_t h_prev_stake_hash[PREV_STAKE_HASH_BYTES*HDR_DEPTH];
-    volatile uint64_t align9;
-    volatile uint8_t h_prev_stake_n[PREV_STAKE_N_BYTES*HDR_DEPTH];
-    volatile uint64_t align10;
-    volatile uint8_t h_block_sig[BLOCK_SIG_BYTES*HDR_DEPTH];
-} STAGE1_S;
-
- 
 struct SharedData {
-    volatile bool is_stage1;
     volatile uint64_t nonce;
     volatile uint8_t data[TOTAL_BYTES_SEND];      // Buffer to send data
-    volatile uint32_t utxo_set_idx4host;
-    volatile uint32_t utxo_set_time4host;
-    bool is_data_ready;  // Flag to indicate if data is ready
-    STAGE1_S stage1_data;
 };
 volatile SharedData* shared_data;
  
@@ -693,9 +635,42 @@ void ThreadStakeMiner(wallet::CWallet& wallet, CConnman& connman, ChainstateMana
 {
     SetThreadPriority(THREAD_PRIORITY_BELOW_NORMAL);
 
+#ifdef _WIN32
+    // Windows code here
+    // Create or open a named shared memory region
+    hMapFile = CreateFileMappingA(
+        INVALID_HANDLE_VALUE,    // Use system paging file
+        NULL,                    // Default security
+        PAGE_READWRITE,          // Read/write access
+        0,                       // Maximum object size (high-order DWORD)
+        sizeof(SharedData),      // Maximum object size (low-order DWORD)
+        SHM_NAME                 // Name of mapping object
+    );
 
-    shm_unlink(SHM_NAME); 
+    if (hMapFile == NULL) {
+        std::cerr << "Could not create file mapping object: " << GetLastError() << std::endl;
+        return;
+    }
 
+    // Map the view of the file into the process's address space
+    shared_data = (SharedData*) MapViewOfFile(
+        hMapFile,            // Handle to mapping object
+        FILE_MAP_ALL_ACCESS, // Read/write permission
+        0,
+        0,
+        sizeof(SharedData)
+    );
+
+    if (shared_data == NULL) {
+        std::cerr << "Could not map view of file: " << GetLastError() << std::endl;
+        CloseHandle(hMapFile);
+        return;
+    }
+    
+#else
+    // Linux/POSIX code here
+
+    shm_unlink(SHM_NAME);
 
     // Open shared memory
     int shm_fd = shm_open(SHM_NAME, O_CREAT | O_RDWR, 0666);
@@ -717,14 +692,7 @@ void ThreadStakeMiner(wallet::CWallet& wallet, CConnman& connman, ChainstateMana
         return ;
     }
 
-    shared_data->is_data_ready = false;   
-
-
-    // Always start in stage2, we want a transtion in the GPU code to from stage2 to stage1 to trigger the copy of stage1 data.
-    shared_data->is_stage1 = false;
-    uint32_t tmp = 0; // ZERO start time turns off stage1 in GPU
-    memcpy((void*)&shared_data->stage1_data.h_start_time[0], &tmp, 4);
-
+#endif
 
 
     s_mining_thread_exiting.store(false);
@@ -811,82 +779,18 @@ void ThreadStakeMiner(wallet::CWallet& wallet, CConnman& connman, ChainstateMana
             continue;
         }
 
+
         //
         // Select the suitable coins
         //
-        static bool is_init = false;
         if (chainTipForCoins != chainman.ActiveChain().Tip()->GetBlockHash()) {
             const auto start_time{SteadyClock::now()};
             LogPrint(BCLog::COINSTAKE, "Chain tip changed since previous coin selection, selecting new coins for staking...\n");
+            LOCK(wallet.cs_wallet);
+            setCoins.clear();
             chainTipForCoins = chainman.ActiveChain().Tip()->GetBlockHash();
-
-            // setup coins one time to make each new block takes less time to start mining
-            if ( !is_init )
-            {
-                LOCK(wallet.cs_wallet);
-                setCoins.clear();
-                wallet.SelectCoinsForStaking(setCoins);
-                LogPrint(BCLog::COINSTAKE, "Selecting coins for staking completed in %15dms\n", Ticks<std::chrono::milliseconds>(SteadyClock::now() - start_time));
-                                
-                /// Copy over the utxos data for the CUDA GPU mining
-                int n = 0;
-                for(const std::pair<const CWalletTx*,unsigned int> &pcoin : setCoins)
-                {
-                    memcpy((void*)&shared_data->stage1_data.h_utxos_hash[n*32], pcoin.first->GetHash().data(), 32);
-                    memcpy((void*)&shared_data->stage1_data.h_utxos_n[n*4], &pcoin.second, 4);
-
-                    COutPoint prevout = COutPoint(pcoin.first->GetHash(), pcoin.second);
-
-                    Coin coinPrev;
-                    if(!chainman.ActiveChainstate().CoinsTip().GetCoin(prevout, coinPrev)){
-                        return;
-                    }
-
-                    CBlockIndex* pindexPrev = chainman.ActiveChain().Tip();
-
-                    CBlockIndex* blockFrom = pindexPrev->GetAncestor(coinPrev.nHeight);
-                    if(!blockFrom) {
-                        return;
-                    }
-                    
-                    memcpy((void*)&shared_data->stage1_data.h_utxos_block_from_time[n*4], &blockFrom->nTime, 4);
-
-                    n++;
-
-                    if ( n >= WALLET_UTXOS_LENGTH)
-                    {
-                        break;
-                    }
-                }
-
-                is_init = true;
-            }
-
-
-            // Fill in data for Stage1
-
-            auto& chain_active = gp_chainman->m_active_chainstate->m_chain;
-            int h = chain_active.Height();
-            for( int n=0;n<256;n++)
-            {
-                memcpy((void*)&shared_data->stage1_data.h_hash_merkle_root[n*32], chain_active[h-n]->GetBlockHeader_hashMerkleRoot().data(), 32);
-                memcpy((void*)&shared_data->stage1_data.h_hash_prev_block[n*32], chain_active[h-n]->GetBlockHeader_hashPrevBlock().data(), 32);
-                uint32_t nbits = chain_active[h-n]->GetBlockHeader_nBits();
-                memcpy((void*)&shared_data->stage1_data.h_n_bits[n*4], &nbits, 4);
-                uint32_t ntime = chain_active[h-n]->GetBlockHeader_nTime();
-                memcpy((void*)&shared_data->stage1_data.h_n_time[n*4], &ntime, 4);
-                memcpy((void*)&shared_data->stage1_data.h_prev_stake_hash[n*32], chain_active[h-n]->GetBlockHeader_prevoutStakehash().data(), 32);
-                uint32_t prev_n = chain_active[h-n]->GetBlockHeader_prevoutStaken();
-                memcpy((void*)&shared_data->stage1_data.h_prev_stake_n[n*4], &prev_n, 4);
-                memcpy((void*)&shared_data->stage1_data.h_block_sig[n*80], chain_active[h-n]->GetBlockHeader_vchBlockSig().data(), 80);
-            }
-
-            uint32_t tmp = 0;
-            memcpy((void*)&shared_data->stage1_data.h_start_time[0], &tmp, 4);
-            memcpy((void*)&shared_data->stage1_data.h_stake_modifier[0], chainman.ActiveChain().Tip()->nStakeModifier.data(), 32);
-
-            shared_data->is_stage1 = true;
-
+            wallet.SelectCoinsForStaking(setCoins);
+            LogPrint(BCLog::COINSTAKE, "Selecting coins for staking completed in %15dms\n", Ticks<std::chrono::milliseconds>(SteadyClock::now() - start_time));
         } else {
             LogPrint(BCLog::COINSTAKE, "Chain tip unchanged since previous coin selection, using previously selected coins...\n");
         }
@@ -908,16 +812,10 @@ void ThreadStakeMiner(wallet::CWallet& wallet, CConnman& connman, ChainstateMana
             }
 
             CBlockIndex* pindexPrev = chainman.ActiveChain().Tip();
-      
-            shared_data->is_stage1 = true;
             
             // NON ZERO start time turns ON stage1 in GPU
             uint32_t gpu_start_time = GetAdjustedTime64();
             uint32_t i=gpu_start_time;
-
-            //std::cout << "i  gpu_start_time" << i << " " << gpu_start_time << std::endl;
-
-            memcpy((void*)&shared_data->stage1_data.h_start_time[0], &gpu_start_time, 4);
 
             // if ( profiler < 200 )
             // {
