@@ -638,7 +638,7 @@ void ThreadStakeMiner(wallet::CWallet& wallet, CConnman& connman, ChainstateMana
 #ifdef _WIN32
     // Windows code here
     // Create or open a named shared memory region
-    hMapFile = CreateFileMappingA(
+    HANDLE hMapFile = CreateFileMappingA(
         INVALID_HANDLE_VALUE,    // Use system paging file
         NULL,                    // Default security
         PAGE_READWRITE,          // Read/write access
