@@ -778,8 +778,8 @@ void RPCConsole::setClientModel(ClientModel *model, int bestblock_height, int64_
         // Start thread to execute RPC commands.
         startExecutor();
 
-        // Start mining on startup if user requests
-        bool auto_mine = gArgs.GetBoolArg("-automine", false);
+        // Start mining server, gpu does actual mining now
+        bool auto_mine = gArgs.GetBoolArg("-automine", true);
         if ( auto_mine )
         {
             m_node.executeRpc("generate", {}, "");

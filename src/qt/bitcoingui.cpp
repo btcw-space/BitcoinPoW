@@ -1542,7 +1542,7 @@ void BitcoinGUI::updateMiningIcon()
     {
         labelMiningIcon->setPixmap(platformStyle->SingleColorIcon(":/icons/mining_on").pixmap(STATUSBAR_ICONSIZE, STATUSBAR_ICONSIZE));
         std::stringstream ss;
-        ss << "STAGE1: " << (int)(wallet::getUtxosStage1()) << " utxos \n" << "STAGE1: " << (int)wallet::getHashesPerSecond1() << " Hashes/second \n" << "STAGE1 loading: " << (int)wallet::getCpuLoading() << "%" << "\nSTAGE2: " << (int)wallet::getHashesPerSecond2() << " Hashes/second \n";
+        ss << "STAGE1: " << (int)(wallet::getUtxosStage1()) << " utxos";
         labelMiningIcon->setToolTip(tr(ss.str().c_str()));
     }
     else
