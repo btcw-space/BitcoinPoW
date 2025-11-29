@@ -96,7 +96,7 @@ include(CMakeDependentOption)
 # When adding a new option, end the <help_text> with a full stop for consistency.
 option(BUILD_BITCOIN_BIN "Build bitcoin executable." ON)
 option(BUILD_DAEMON "Build bitcoind executable." ON)
-option(BUILD_GUI "Build bitcoin-qt executable." OFF)
+option(BUILD_GUI "Build bitcoin-qt executable." ON)
 option(BUILD_CLI "Build bitcoin-cli executable." ON)
 
 option(BUILD_TESTS "Build test_bitcoin and other unit test executables." ON)
