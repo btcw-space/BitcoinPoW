@@ -163,9 +163,10 @@ The legacy wallet uses Berkeley DB. To ensure backwards compatibility it is
 recommended to use Berkeley DB 4.8. If you have to build it yourself, and don't
 want to use any other libraries built in depends, you can do:
 ```bash
+export DEPENDS_DIR=/path/to/bitcoin-pow/depends
 make -C depends NO_BOOST=1 NO_LIBEVENT=1 NO_QT=1 NO_SQLITE=1 NO_NATPMP=1 NO_UPNP=1 NO_ZMQ=1 NO_USDT=1
 ...
-to: /path/to/bitcoin/depends/x86_64-pc-linux-gnu
+This will build the dependencies with the flags mentioned (disabling all optional libraries) and install them under /path/to/bitcoin-pow/depends/x86_64-pc-linux-gnu
 ```
 and configure using the following:
 ```bash
