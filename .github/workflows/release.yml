@@ -100,73 +100,236 @@ jobs:
           key: linux-x86_64-ccache-${{ github.run_id }}
 
   # ============================================================
-  # Windows x64 — cross-compiled from Linux using mingw-w64
+  # Windows x64 — native MSVC build with Qt GUI
   # ============================================================
   windows-x64:
-    name: 'Windows x64'
-    runs-on: ubuntu-22.04
-    timeout-minutes: 180
+    name: 'Windows x64 (MSVC)'
+    runs-on: windows-2022
+    timeout-minutes: 240
+
+    env:
+      CCACHE_MAXSIZE: '200M'
+      CI_CCACHE_VERSION: '4.7.5'
+      CI_QT_CONF: '-release -silent -opensource -confirm-license -opengl desktop -static -static-runtime -mp -qt-zlib -qt-pcre -qt-libpng -nomake examples -nomake tests -nomake tools -no-angle -no-dbus -no-gif -no-gtk -no-ico -no-icu -no-libjpeg -no-libudev -no-sql-sqlite -no-sql-odbc -no-sqlite -no-vulkan -skip qt3d -skip qtactiveqt -skip qtandroidextras -skip qtcharts -skip qtconnectivity -skip qtdatavis3d -skip qtdeclarative -skip doc -skip qtdoc -skip qtgamepad -skip qtgraphicaleffects -skip qtimageformats -skip qtlocation -skip qtlottie -skip qtmacextras -skip qtmultimedia -skip qtnetworkauth -skip qtpurchasing -skip qtquick3d -skip qtquickcontrols -skip qtquickcontrols2 -skip qtquicktimeline -skip qtremoteobjects -skip qtscript -skip qtscxml -skip qtsensors -skip qtserialbus -skip qtserialport -skip qtspeech -skip qtsvg -skip qtvirtualkeyboard -skip qtwayland -skip qtwebchannel -skip qtwebengine -skip qtwebglplugin -skip qtwebsockets -skip qtwebview -skip qtx11extras -skip qtxmlpatterns -no-openssl -no-feature-bearermanagement -no-feature-printdialog -no-feature-printer -no-feature-printpreviewdialog -no-feature-printpreviewwidget -no-feature-sql -no-feature-sqlmodel -no-feature-textbrowser -no-feature-textmarkdownwriter -no-feature-textodfwriter -no-feature-xml'
+      CI_QT_DIR: 'qt-everywhere-src-5.15.10'
+      CI_QT_URL: 'https://download.qt.io/official_releases/qt/5.15/5.15.10/single/qt-everywhere-opensource-src-5.15.10.zip'
+      PYTHONUTF8: 1
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Install dependencies
+      - name: Fix Visual Studio installation
         run: |
-          sudo apt-get update
-          sudo apt-get install -y \
-            build-essential libtool autotools-dev automake cmake pkg-config \
-            bsdmainutils curl ca-certificates ccache python3 python3-setuptools \
-            g++-mingw-w64-x86-64-posix nsis zip bison
+          Set-Location "C:\Program Files (x86)\Microsoft Visual Studio\Installer\"
+          $InstallPath = "C:\Program Files\Microsoft Visual Studio\2022\Enterprise"
+          $componentsToRemove= @(
+            "Microsoft.VisualStudio.Component.VC.14.37.17.7.ARM.Spectre"
+            "Microsoft.VisualStudio.Component.VC.14.37.17.7.ARM"
+            "Microsoft.VisualStudio.Component.VC.14.37.17.7.ARM64.Spectre"
+            "Microsoft.VisualStudio.Component.VC.14.37.17.7.ARM64"
+            "Microsoft.VisualStudio.Component.VC.14.37.17.7.ATL.ARM.Spectre"
+            "Microsoft.VisualStudio.Component.VC.14.37.17.7.ATL.ARM"
+            "Microsoft.VisualStudio.Component.VC.14.37.17.7.ATL.ARM64.Spectre"
+            "Microsoft.VisualStudio.Component.VC.14.37.17.7.ATL.ARM64"
+            "Microsoft.VisualStudio.Component.VC.14.37.17.7.ATL.Spectre"
+            "Microsoft.VisualStudio.Component.VC.14.37.17.7.ATL"
+            "Microsoft.VisualStudio.Component.VC.14.37.17.7.MFC.ARM.Spectre"
+            "Microsoft.VisualStudio.Component.VC.14.37.17.7.MFC.ARM"
+            "Microsoft.VisualStudio.Component.VC.14.37.17.7.MFC.ARM64.Spectre"
+            "Microsoft.VisualStudio.Component.VC.14.37.17.7.MFC.ARM64"
+            "Microsoft.VisualStudio.Component.VC.14.37.17.7.MFC.Spectre"
+            "Microsoft.VisualStudio.Component.VC.14.37.17.7.MFC"
+            "Microsoft.VisualStudio.Component.VC.14.37.17.7.x86.x64.Spectre"
+            "Microsoft.VisualStudio.Component.VC.14.37.17.7.x86.x64"
+            "Microsoft.VisualStudio.Component.VC.14.38.17.8.ARM"
+            "Microsoft.VisualStudio.Component.VC.14.38.17.8.ARM.Spectre"
+            "Microsoft.VisualStudio.Component.VC.14.38.17.8.ARM64"
+            "Microsoft.VisualStudio.Component.VC.14.38.17.8.ARM64.Spectre"
+            "Microsoft.VisualStudio.Component.VC.14.38.17.8.ATL"
+            "Microsoft.VisualStudio.Component.VC.14.38.17.8.ATL.ARM"
+            "Microsoft.VisualStudio.Component.VC.14.38.17.8.ATL.ARM.Spectre"
+            "Microsoft.VisualStudio.Component.VC.14.38.17.8.ATL.ARM64"
+            "Microsoft.VisualStudio.Component.VC.14.38.17.8.ATL.ARM64.Spectre"
+            "Microsoft.VisualStudio.Component.VC.14.38.17.8.ATL.Spectre"
+            "Microsoft.VisualStudio.Component.VC.14.38.17.8.MFC"
+            "Microsoft.VisualStudio.Component.VC.14.38.17.8.MFC.ARM"
+            "Microsoft.VisualStudio.Component.VC.14.38.17.8.MFC.ARM.Spectre"
+            "Microsoft.VisualStudio.Component.VC.14.38.17.8.MFC.ARM64"
+            "Microsoft.VisualStudio.Component.VC.14.38.17.8.MFC.ARM64.Spectre"
+            "Microsoft.VisualStudio.Component.VC.14.38.17.8.MFC.Spectre"
+            "Microsoft.VisualStudio.Component.VC.14.38.17.8.x86.x64"
+            "Microsoft.VisualStudio.Component.VC.14.38.17.8.x86.x64.Spectre"
+          )
+          [string]$workloadArgs = $componentsToRemove | ForEach-Object {" --remove " +  $_}
+          $Arguments = ('/c', "vs_installer.exe", 'modify', '--installPath', "`"$InstallPath`"",$workloadArgs, '--quiet', '--norestart', '--nocache')
+          $process = Start-Process -FilePath cmd.exe -ArgumentList $Arguments -Wait -PassThru -WindowStyle Hidden
+          $process = Start-Process -FilePath cmd.exe -ArgumentList $Arguments -Wait -PassThru -WindowStyle Hidden
 
-      - name: Set Ccache directory
-        run: echo "CCACHE_DIR=${RUNNER_TEMP}/ccache_dir" >> "$GITHUB_ENV"
+      - name: Configure Developer Command Prompt for Microsoft Visual C++
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: x64
+
+      - name: Check MSBuild and Qt
+        run: |
+          msbuild -version | Out-File -FilePath "$env:GITHUB_WORKSPACE\msbuild_version"
+          Get-Content -Path "$env:GITHUB_WORKSPACE\msbuild_version"
+          $env:CI_QT_URL | Out-File -FilePath "$env:GITHUB_WORKSPACE\qt_url"
+          $env:CI_QT_CONF | Out-File -FilePath "$env:GITHUB_WORKSPACE\qt_conf"
+
+      - name: Restore static Qt cache
+        id: static-qt-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: C:\Qt_static
+          key: ${{ github.job }}-static-qt-${{ hashFiles('msbuild_version', 'qt_url', 'qt_conf') }}
+
+      - name: Build static Qt. Download
+        if: steps.static-qt-cache.outputs.cache-hit != 'true'
+        shell: cmd
+        run: |
+          curl --location --output C:\qt-src.zip %CI_QT_URL%
+          choco install --yes --no-progress jom
+
+      - name: Build static Qt. Expand source archive
+        if: steps.static-qt-cache.outputs.cache-hit != 'true'
+        shell: cmd
+        run: tar -xf C:\qt-src.zip -C C:\
+
+      - name: Build static Qt. Create build directory
+        if: steps.static-qt-cache.outputs.cache-hit != 'true'
+        run: |
+          Rename-Item -Path "C:\$env:CI_QT_DIR" -NewName "C:\qt-src"
+          New-Item -ItemType Directory -Path "C:\qt-src\build"
+
+      - name: Build static Qt. Configure
+        if: steps.static-qt-cache.outputs.cache-hit != 'true'
+        working-directory: C:\qt-src\build
+        shell: cmd
+        run: ..\configure %CI_QT_CONF% -prefix C:\Qt_static
+
+      - name: Build static Qt. Build
+        if: steps.static-qt-cache.outputs.cache-hit != 'true'
+        working-directory: C:\qt-src\build
+        shell: cmd
+        run: jom
+
+      - name: Build static Qt. Install
+        if: steps.static-qt-cache.outputs.cache-hit != 'true'
+        working-directory: C:\qt-src\build
+        shell: cmd
+        run: jom install
+
+      - name: Save static Qt cache
+        if: steps.static-qt-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: C:\Qt_static
+          key: ${{ github.job }}-static-qt-${{ hashFiles('msbuild_version', 'qt_url', 'qt_conf') }}
+
+      - name: Ccache installation cache
+        id: ccache-installation-cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            C:\ProgramData\chocolatey\lib\ccache
+            C:\ProgramData\chocolatey\bin\ccache.exe
+            C:\ccache\cl.exe
+          key: ${{ github.job }}-ccache-installation-${{ env.CI_CCACHE_VERSION }}
+
+      - name: Install Ccache
+        if: steps.ccache-installation-cache.outputs.cache-hit != 'true'
+        run: |
+          choco install --yes --no-progress ccache --version=$env:CI_CCACHE_VERSION
+          New-Item -ItemType Directory -Path "C:\ccache"
+          Copy-Item -Path "$env:ChocolateyInstall\lib\ccache\tools\ccache-$env:CI_CCACHE_VERSION-windows-x86_64\ccache.exe" -Destination "C:\ccache\cl.exe"
 
       - name: Restore Ccache cache
+        id: ccache-cache
         uses: actions/cache/restore@v4
         with:
-          path: ${{ env.CCACHE_DIR }}
-          key: windows-x64-ccache-${{ github.run_id }}
-          restore-keys: windows-x64-ccache-
+          path: ~/AppData/Local/ccache
+          key: ${{ github.job }}-ccache-${{ github.run_id }}
+          restore-keys: ${{ github.job }}-ccache-
 
-      - name: Restore depends cache
-        uses: actions/cache/restore@v4
-        with:
-          path: depends/built
-          key: windows-x64-depends-${{ hashFiles('depends/packages/*.mk') }}
-          restore-keys: windows-x64-depends-
-
-      - name: Build depends
+      - name: Using vcpkg with MSBuild
         run: |
-          make -C depends HOST=x86_64-w64-mingw32 ${{ env.MAKEJOBS }}
+          Set-Location "$env:VCPKG_INSTALLATION_ROOT"
+          Add-Content -Path "triplets\x64-windows-static.cmake" -Value "set(VCPKG_BUILD_TYPE release)"
+          vcpkg --vcpkg-root "$env:VCPKG_INSTALLATION_ROOT" integrate install
+          git rev-parse HEAD | Out-File -FilePath "$env:GITHUB_WORKSPACE\vcpkg_commit"
+          Get-Content -Path "$env:GITHUB_WORKSPACE\vcpkg_commit"
+
+      - name: vcpkg tools cache
+        uses: actions/cache@v4
+        with:
+          path: C:/vcpkg/downloads/tools
+          key: ${{ github.job }}-vcpkg-tools
+
+      - name: vcpkg binary cache
+        uses: actions/cache@v4
+        with:
+          path: ~/AppData/Local/vcpkg/archives
+          key: ${{ github.job }}-vcpkg-binary-${{ hashFiles('vcpkg_commit', 'msbuild_version', 'build_msvc/vcpkg.json') }}
+
+      - name: Generate project files
+        run: py -3 build_msvc\msvc-autogen.py
 
       - name: Build
+        shell: cmd
         run: |
-          ./autogen.sh
-          CONFIG_SITE=$PWD/depends/x86_64-w64-mingw32/share/config.site \
-          ./configure --prefix=/ \
-                      --enable-reduce-exports \
-                      --disable-bench \
-                      --disable-tests \
-                      --disable-gui-tests \
-                      --disable-fuzz-binary
-          make ${{ env.MAKEJOBS }}
+          ccache --zero-stats
+          msbuild build_msvc\bitcoin.sln -property:CLToolPath=C:\ccache;CLToolExe=cl.exe;UseMultiToolTask=true;Configuration=Release -maxCpuCount -verbosity:minimal -noLogo
+
+      - name: Ccache stats
+        run: ccache --show-stats
+
+      - name: Save Ccache cache
+        uses: actions/cache/save@v4
+        if: always()
+        with:
+          path: ~/AppData/Local/ccache
+          key: ${{ github.job }}-ccache-${{ github.run_id }}
 
       - name: Create package
         run: |
-          DISTNAME="${{ env.PROJECT_NAME }}-${{ github.ref_name }}-win64"
-          mkdir -p "${DISTNAME}"
-          cp src/bitcoind.exe src/bitcoin-cli.exe src/bitcoin-tx.exe src/bitcoin-util.exe src/bitcoin-wallet.exe "${DISTNAME}/" 2>/dev/null || true
-          cp src/qt/bitcoin-qt.exe "${DISTNAME}/" 2>/dev/null || true
-          cp README.md COPYING "${DISTNAME}/" 2>/dev/null || true
-          cp share/examples/bitcoin.conf "${DISTNAME}/" 2>/dev/null || true
-          zip -r "${DISTNAME}.zip" "${DISTNAME}"
-          sha256sum "${DISTNAME}.zip" > "${DISTNAME}.zip.sha256"
-
-      - name: Create installer
-        continue-on-error: true
-        run: |
-          make deploy BITCOIN_WIN_INSTALLER="${{ env.PROJECT_NAME }}-${{ github.ref_name }}-win64-setup.exe" || true
+          $DISTNAME = "${{ env.PROJECT_NAME }}-${{ github.ref_name }}-win64"
+          New-Item -ItemType Directory -Path $DISTNAME -Force
+          # Copy Release binaries (build_msvc output locations)
+          $binDirs = @(
+            "build_msvc\x64\Release",
+            "build_msvc\Release",
+            "src"
+          )
+          $exeNames = @(
+            "bitcoind.exe", "bitcoin-cli.exe", "bitcoin-tx.exe",
+            "bitcoin-util.exe", "bitcoin-wallet.exe", "bitcoin-qt.exe"
+          )
+          foreach ($exe in $exeNames) {
+            foreach ($dir in $binDirs) {
+              $path = Join-Path $dir $exe
+              if (Test-Path $path) {
+                Copy-Item -Path $path -Destination "$DISTNAME\"
+                Write-Host "Copied $path"
+                break
+              }
+            }
+          }
+          # Also check qt subdirectory
+          if (Test-Path "build_msvc\x64\Release\bitcoin-qt.exe") {
+            Copy-Item -Path "build_msvc\x64\Release\bitcoin-qt.exe" -Destination "$DISTNAME\" -ErrorAction SilentlyContinue
+          }
+          Copy-Item -Path "README.md" -Destination "$DISTNAME\" -ErrorAction SilentlyContinue
+          Copy-Item -Path "COPYING" -Destination "$DISTNAME\" -ErrorAction SilentlyContinue
+          # List package contents
+          Write-Host "=== Package contents ==="
+          Get-ChildItem "$DISTNAME" | ForEach-Object { Write-Host $_.Name }
+          # Create zip
+          Compress-Archive -Path "$DISTNAME\*" -DestinationPath "$DISTNAME.zip"
+          # Create SHA256
+          $hash = (Get-FileHash -Algorithm SHA256 "$DISTNAME.zip").Hash.ToLower()
+          "$hash  $DISTNAME.zip" | Out-File -FilePath "$DISTNAME.zip.sha256" -Encoding ascii -NoNewline
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
@@ -175,21 +338,6 @@ jobs:
           path: |
             ${{ env.PROJECT_NAME }}-*-win64.zip
             ${{ env.PROJECT_NAME }}-*-win64.zip.sha256
-            ${{ env.PROJECT_NAME }}-*-win64-setup.exe
-
-      - name: Save depends cache
-        uses: actions/cache/save@v4
-        if: always()
-        with:
-          path: depends/built
-          key: windows-x64-depends-${{ hashFiles('depends/packages/*.mk') }}
-
-      - name: Save Ccache cache
-        uses: actions/cache/save@v4
-        if: always()
-        with:
-          path: ${{ env.CCACHE_DIR }}
-          key: windows-x64-ccache-${{ github.run_id }}
 
   # ============================================================
   # macOS ARM64 (Apple Silicon) — native build on M1 runner

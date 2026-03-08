@@ -156,6 +156,9 @@ static bool ProcessUpnp()
     const char * minissdpdpath = nullptr;
     struct UPNPDev * devlist = nullptr;
     char lanaddr[64];
+#if MINIUPNPC_API_VERSION >= 18
+    char lanaddr6[64];
+#endif
 
     int error = 0;
     devlist = upnpDiscover(2000, multicastif, minissdpdpath, 0, 0, 2, &error);
@@ -164,7 +167,11 @@ static bool ProcessUpnp()
     struct IGDdatas data;
     int r;
 
+#if MINIUPNPC_API_VERSION >= 18
+    r = UPNP_GetValidIGD(devlist, &urls, &data, lanaddr, sizeof(lanaddr), lanaddr6, sizeof(lanaddr6));
+#else
     r = UPNP_GetValidIGD(devlist, &urls, &data, lanaddr, sizeof(lanaddr));
+#endif
     if (r == 1)
     {
         if (fDiscover) {
