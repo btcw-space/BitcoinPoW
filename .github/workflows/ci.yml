@@ -69,11 +69,10 @@ jobs:
           # Use clang++, because it is a bit faster and uses less memory than g++
           git rebase --exec "echo Running test-one-commit on \$( git log -1 ) && ./autogen.sh && CC=clang CXX=clang++ ./configure && make clean && make -j $(nproc) check && ./test/functional/test_runner.py -j $(( $(nproc) * 2 ))" ${{ env.TEST_BASE }}
 
-  macos-native-x86_64:
-    name: 'macOS 13 native, x86_64, no depends, sqlite only, gui'
-    # Use latest image, but hardcode version to avoid silent upgrades (and breaks).
+  macos-native-arm64:
+    name: 'macOS 14 native, ARM64 (Apple Silicon), no depends, sqlite only, gui'
     # See: https://github.com/actions/runner-images#available-images.
-    runs-on: macos-13  # Use M1 once available https://github.com/github/roadmap/issues/528
+    runs-on: macos-14
 
     # No need to run on the read-only mirror, unless it is a PR.
     if: github.repository != 'bitcoin-core/gui' || github.event_name == 'pull_request'
@@ -90,7 +89,6 @@ jobs:
 
       - name: Clang version
         run: |
-          sudo xcode-select --switch /Applications/Xcode_15.0.app
           clang --version
 
       - name: Install Homebrew packages
@@ -103,7 +101,7 @@ jobs:
 
       - name: Restore Ccache cache
         id: ccache-cache
-        uses: actions/cache/restore@v3
+        uses: actions/cache/restore@v4
         with:
           path: ${{ env.CCACHE_DIR }}
           key: ${{ github.job }}-ccache-${{ github.run_id }}
@@ -113,7 +111,7 @@ jobs:
         run: ./ci/test_run_all.sh
 
       - name: Save Ccache cache
-        uses: actions/cache/save@v3
+        uses: actions/cache/save@v4
         if: github.event_name != 'pull_request' && steps.ccache-cache.outputs.cache-hit != 'true'
         with:
           path: ${{ env.CCACHE_DIR }}
