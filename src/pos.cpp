@@ -2,8 +2,10 @@
 // Copyright (c) 2009-2018 The Bitcoin Core developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
+#ifndef _MSC_VER
 #pragma GCC optimize("O3")
 #pragma GCC optimize("unroll-loops")
+#endif
 #define BOOST_VARIANT_USE_RELAXED_GET_BY_DEFAULT
 #include <boost/assign/list_of.hpp>
 
