@@ -259,6 +259,8 @@ jobs:
       - name: Using vcpkg with MSBuild
         run: |
           Set-Location "$env:VCPKG_INSTALLATION_ROOT"
+          git fetch origin
+          git checkout c82f74667287d3dc386bce81e44964370c91a289
           Add-Content -Path "triplets\x64-windows-static.cmake" -Value "set(VCPKG_BUILD_TYPE release)"
           vcpkg --vcpkg-root "$env:VCPKG_INSTALLATION_ROOT" integrate install
           git rev-parse HEAD | Out-File -FilePath "$env:GITHUB_WORKSPACE\vcpkg_commit"
@@ -295,42 +297,52 @@ jobs:
           path: ~/AppData/Local/ccache
           key: ${{ github.job }}-ccache-${{ github.run_id }}
 
+      - name: Locate built executables
+        shell: powershell
+        run: |
+          Write-Host "=== Searching for built executables ==="
+          $exeNames = @("bitcoind.exe", "bitcoin-cli.exe", "bitcoin-tx.exe",
+                        "bitcoin-util.exe", "bitcoin-wallet.exe", "bitcoin-qt.exe")
+          foreach ($exe in $exeNames) {
+            $found = Get-ChildItem -Path "build_msvc" -Filter $exe -Recurse -ErrorAction SilentlyContinue
+            if ($found) {
+              foreach ($f in $found) { Write-Host "  Found: $($f.FullName) ($([math]::Round($f.Length/1MB, 1)) MB)" }
+            } else {
+              Write-Host "  NOT FOUND: $exe"
+            }
+          }
+
       - name: Create package
         run: |
           $DISTNAME = "${{ env.PROJECT_NAME }}-${{ github.ref_name }}-win64"
           New-Item -ItemType Directory -Path $DISTNAME -Force
-          # Copy Release binaries (build_msvc output locations)
-          $binDirs = @(
-            "build_msvc\x64\Release",
-            "build_msvc\Release",
-            "src"
-          )
+
           $exeNames = @(
             "bitcoind.exe", "bitcoin-cli.exe", "bitcoin-tx.exe",
             "bitcoin-util.exe", "bitcoin-wallet.exe", "bitcoin-qt.exe"
           )
+
           foreach ($exe in $exeNames) {
-            foreach ($dir in $binDirs) {
-              $path = Join-Path $dir $exe
-              if (Test-Path $path) {
-                Copy-Item -Path $path -Destination "$DISTNAME\"
-                Write-Host "Copied $path"
-                break
-              }
+            $found = Get-ChildItem -Path "build_msvc" -Filter $exe -Recurse -ErrorAction SilentlyContinue |
+                     Where-Object { $_.DirectoryName -match 'Release' } |
+                     Select-Object -First 1
+            if ($found) {
+              Copy-Item -Path $found.FullName -Destination "$DISTNAME\"
+              Write-Host "Copied $($found.FullName)"
+            } else {
+              Write-Host "WARNING: $exe not found in build_msvc"
             }
           }
-          # Also check qt subdirectory
-          if (Test-Path "build_msvc\x64\Release\bitcoin-qt.exe") {
-            Copy-Item -Path "build_msvc\x64\Release\bitcoin-qt.exe" -Destination "$DISTNAME\" -ErrorAction SilentlyContinue
-          }
+
           Copy-Item -Path "README.md" -Destination "$DISTNAME\" -ErrorAction SilentlyContinue
           Copy-Item -Path "COPYING" -Destination "$DISTNAME\" -ErrorAction SilentlyContinue
-          # List package contents
+
           Write-Host "=== Package contents ==="
-          Get-ChildItem "$DISTNAME" | ForEach-Object { Write-Host $_.Name }
-          # Create zip
+          Get-ChildItem "$DISTNAME" | ForEach-Object {
+            Write-Host "  $($_.Name) ($([math]::Round($_.Length/1MB, 1)) MB)"
+          }
+
           Compress-Archive -Path "$DISTNAME\*" -DestinationPath "$DISTNAME.zip"
-          # Create SHA256
           $hash = (Get-FileHash -Algorithm SHA256 "$DISTNAME.zip").Hash.ToLower()
           "$hash  $DISTNAME.zip" | Out-File -FilePath "$DISTNAME.zip.sha256" -Encoding ascii -NoNewline
 
@@ -373,36 +385,67 @@ jobs:
 
       - name: Build
         run: |
+          export PATH="/opt/homebrew/opt/qt@5/bin:$PATH"
+          export PKG_CONFIG_PATH="/opt/homebrew/opt/qt@5/lib/pkgconfig:$PKG_CONFIG_PATH"
+          QT5_PREFIX="$(brew --prefix qt@5)"
           ./autogen.sh
           ./configure --with-gui=yes \
                       --enable-reduce-exports \
                       --disable-bench \
                       --disable-tests \
                       --disable-gui-tests \
-                      --disable-fuzz-binary
+                      --disable-fuzz-binary \
+                      --with-qt-translationdir="${QT5_PREFIX}/translations" \
+                      --with-qt-plugindir="${QT5_PREFIX}/plugins" \
+                      --with-qt-bindir="${QT5_PREFIX}/bin"
           make ${{ env.MAKEJOBS }}
+
+      - name: Create .app bundle
+        run: |
+          export PATH="/opt/homebrew/opt/qt@5/bin:$PATH"
+          make deploy
 
       - name: Create package
         run: |
-          make deploy || true
           DISTNAME="${{ env.PROJECT_NAME }}-${{ github.ref_name }}-arm64-apple-darwin"
+          mkdir -p "${DISTNAME}"
+
+          echo "=== Checking make deploy output ==="
+          ls -la dist/ 2>/dev/null || echo "No dist/ directory"
+          ls -la *.zip 2>/dev/null || echo "No .zip at top level"
+
+          if [ -d "dist/Bitcoin-Qt.app" ]; then
+            echo "Found fully bundled .app in dist/"
+            cp -R dist/Bitcoin-Qt.app "${DISTNAME}/Bitcoin-Qt.app"
+          else
+            echo "ERROR: dist/Bitcoin-Qt.app not found — make deploy failed to produce a bundled app"
+            exit 1
+          fi
+
           mkdir -p "${DISTNAME}/bin"
-          cp src/bitcoind src/bitcoin-cli src/bitcoin-tx src/bitcoin-util src/bitcoin-wallet "${DISTNAME}/bin/" 2>/dev/null || true
-          cp src/qt/bitcoin-qt "${DISTNAME}/bin/" 2>/dev/null || true
+          for bin in bitcoind bitcoin-cli bitcoin-tx bitcoin-util bitcoin-wallet; do
+            if [ -f "src/${bin}" ]; then
+              strip "src/${bin}" 2>/dev/null || true
+              cp "src/${bin}" "${DISTNAME}/bin/"
+            fi
+          done
+
           cp README.md COPYING "${DISTNAME}/" 2>/dev/null || true
           cp share/examples/bitcoin.conf "${DISTNAME}/" 2>/dev/null || true
-          cp -r Bitcoin-Core.app "${DISTNAME}/" 2>/dev/null || true
-          cp Bitcoin-Core.zip "${DISTNAME}/" 2>/dev/null || true
-          tar czf "${DISTNAME}.tar.gz" "${DISTNAME}"
-          shasum -a 256 "${DISTNAME}.tar.gz" > "${DISTNAME}.tar.gz.sha256"
+
+          echo "=== Package contents ==="
+          find "${DISTNAME}" -type f | head -30
+
+          ditto -c -k --sequesterRsrc --keepParent "${DISTNAME}" "${DISTNAME}.zip"
+          shasum -a 256 "${DISTNAME}.zip" > "${DISTNAME}.zip.sha256"
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: macos-arm64
           path: |
-            ${{ env.PROJECT_NAME }}-*-arm64-apple-darwin.tar.gz
-            ${{ env.PROJECT_NAME }}-*-arm64-apple-darwin.tar.gz.sha256
+            ${{ env.PROJECT_NAME }}-*-arm64-apple-darwin.zip
+            ${{ env.PROJECT_NAME }}-*-arm64-apple-darwin.zip.sha256
 
       - name: Save Ccache cache
         uses: actions/cache/save@v4
@@ -471,7 +514,7 @@ jobs:
             |----------|------|
             | 🐧 Linux x86_64 | `${{ env.PROJECT_NAME }}-${{ steps.tag.outputs.tag }}-x86_64-linux-gnu.tar.gz` |
             | 🪟 Windows x64 | `${{ env.PROJECT_NAME }}-${{ steps.tag.outputs.tag }}-win64.zip` |
-            | 🍎 macOS Apple Silicon | `${{ env.PROJECT_NAME }}-${{ steps.tag.outputs.tag }}-arm64-apple-darwin.tar.gz` |
+            | 🍎 macOS Apple Silicon | `${{ env.PROJECT_NAME }}-${{ steps.tag.outputs.tag }}-arm64-apple-darwin.zip` |
 
             ### Verify Downloads
             Check the `SHA256SUMS` file to verify the integrity of your download.
