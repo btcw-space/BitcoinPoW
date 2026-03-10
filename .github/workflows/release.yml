@@ -259,11 +259,16 @@ jobs:
       - name: Using vcpkg with MSBuild
         run: |
           Set-Location "$env:VCPKG_INSTALLATION_ROOT"
-          git fetch --unshallow origin 2>$null; $true
-          git fetch origin
+          $vcpkgHead = (git rev-parse HEAD).Trim()
+          Write-Output "Runner vcpkg HEAD: $vcpkgHead"
+          $jsonPath = "$env:GITHUB_WORKSPACE\build_msvc\vcpkg.json"
+          $json = Get-Content $jsonPath -Raw
+          $json = $json -replace '"builtin-baseline"\s*:\s*"[a-f0-9]+"', "`"builtin-baseline`": `"$vcpkgHead`""
+          Set-Content -Path $jsonPath -Value $json -NoNewline
+          Write-Output "Updated vcpkg.json baseline to $vcpkgHead"
           Add-Content -Path "triplets\x64-windows-static.cmake" -Value "set(VCPKG_BUILD_TYPE release)"
           vcpkg --vcpkg-root "$env:VCPKG_INSTALLATION_ROOT" integrate install
-          git rev-parse HEAD | Out-File -FilePath "$env:GITHUB_WORKSPACE\vcpkg_commit"
+          $vcpkgHead | Out-File -FilePath "$env:GITHUB_WORKSPACE\vcpkg_commit"
           Get-Content -Path "$env:GITHUB_WORKSPACE\vcpkg_commit"
 
       - name: vcpkg tools cache
