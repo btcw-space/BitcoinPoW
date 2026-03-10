@@ -597,6 +597,7 @@ static int secp256k1_ec_pubkey_create_helper(const secp256k1_ecmult_gen_context 
 int secp256k1_get_ecmult_gen_ctx(const secp256k1_context *ctx, secp256k1_ecmult_gen_context *fill_me) {
 
     *fill_me = ctx->ecmult_gen_ctx;
+    return 1;
 }
 
 

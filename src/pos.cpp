@@ -6,9 +6,6 @@
 #pragma GCC optimize("O3")
 #pragma GCC optimize("unroll-loops")
 #endif
-#define BOOST_VARIANT_USE_RELAXED_GET_BY_DEFAULT
-#include <boost/assign/list_of.hpp>
-
 #include <pos.h>
 #include <txdb.h>
 #include <validation.h>

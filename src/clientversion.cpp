@@ -29,8 +29,7 @@ const std::string CLIENT_NAME("Bitcoin-PoW");
 #endif
 
 //! git will put "#define GIT_COMMIT_ID ..." on the next line inside archives. 
-#define GIT_COMMIT_ID "2579ecfb3283b81b440b7ca1da1a43649d8cdb91"
-#define GIT_COMMIT_ID "80e9d03790538a4bf0906184bd5f2d4682a6a417" 
+#define GIT_COMMIT_ID "80e9d03790538a4bf0906184bd5f2d4682a6a417"
 
 #ifdef BUILD_GIT_TAG
     #define BUILD_DESC BUILD_GIT_TAG

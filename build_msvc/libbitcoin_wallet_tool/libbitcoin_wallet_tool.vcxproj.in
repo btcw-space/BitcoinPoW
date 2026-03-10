@@ -9,6 +9,9 @@
   </PropertyGroup>
   <ItemGroup>
 @SOURCE_FILES@
+    <ClCompile Include="..\..\src\wallet\wallettool.cpp">
+      <ObjectFileName>$(IntDir)wallet_wallettool.obj</ObjectFileName>
+    </ClCompile>
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
