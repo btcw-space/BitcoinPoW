@@ -64,7 +64,7 @@ jobs:
       - name: Build
         run: |
           ./autogen.sh
-          ./configure --with-gui=yes \
+          ./configure --with-gui=qt5 \
                       --enable-reduce-exports \
                       --disable-bench \
                       --disable-tests \
@@ -389,7 +389,7 @@ jobs:
           export PKG_CONFIG_PATH="/opt/homebrew/opt/qt@5/lib/pkgconfig:$PKG_CONFIG_PATH"
           QT5_PREFIX="$(brew --prefix qt@5)"
           ./autogen.sh
-          ./configure --with-gui=yes \
+          ./configure --with-gui=qt5 \
                       --enable-reduce-exports \
                       --disable-bench \
                       --disable-tests \

@@ -105,8 +105,6 @@ bool CheckStakeKernelHash(CBlockIndex* pindexPrev, unsigned int nBits, uint32_t 
         bnTarget *= 100;
     }
 
-
-
     if ( (pindexPrev->nHeight + 1) < BITCOIN_POW256_START_HEIGHT )
     {
         if (actual <= bnTarget)
