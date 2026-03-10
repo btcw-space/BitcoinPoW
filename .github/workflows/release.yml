@@ -290,7 +290,13 @@ jobs:
         shell: cmd
         run: |
           ccache --zero-stats
-          msbuild build_msvc\bitcoin.sln -property:CLToolPath=C:\ccache;CLToolExe=cl.exe;UseMultiToolTask=true;Configuration=Release -maxCpuCount -verbosity:minimal -noLogo
+          msbuild build_msvc\bitcoin.sln -property:CLToolPath=C:\ccache;CLToolExe=cl.exe;UseMultiToolTask=true;Configuration=Release -maxCpuCount -verbosity:minimal -noLogo "-flp:errorsonly;logfile=build_errors.log"
+          set BUILD_EXIT=%ERRORLEVEL%
+          echo.
+          echo ========== BUILD ERRORS (if any) ==========
+          if exist build_errors.log (type build_errors.log) else (echo No error log found)
+          echo =============================================
+          exit /b %BUILD_EXIT%
 
       - name: Ccache stats
         run: ccache --show-stats
