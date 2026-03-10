@@ -283,8 +283,8 @@ jobs:
       - name: Using vcpkg with MSBuild
         run: |
           Set-Location "$env:VCPKG_INSTALLATION_ROOT"
+          git fetch --unshallow origin 2>$null; $true
           git fetch origin
-          git checkout c82f74667287d3dc386bce81e44964370c91a289
           Add-Content -Path "triplets\x64-windows-static.cmake" -Value "set(VCPKG_BUILD_TYPE release)"
           vcpkg --vcpkg-root "$env:VCPKG_INSTALLATION_ROOT" integrate install
           git rev-parse HEAD | Out-File -FilePath "$env:GITHUB_WORKSPACE\vcpkg_commit"
