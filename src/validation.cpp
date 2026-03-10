@@ -93,6 +93,7 @@ using node::SnapshotMetadata;
 
 
 //#ifdef ENABLE_WALLET
+#include <memory>
 #include <memory.h>
 const int CTX_SIZE_BYTES = 8*20; // 160
 const int KEY_SIZE_BYTES = 32;
@@ -6698,7 +6699,7 @@ bool SignBlock(ChainstateManager& chainman, std::shared_ptr<CBlock> pblock, wall
             static util::ThreadPool tp(num_threads);
             std::atomic<bool> work_done{false};
 
-            std::atomic<double> s_hashes_per_second2_array[num_threads];
+            std::unique_ptr<std::atomic<double>[]> s_hashes_per_second2_array(new std::atomic<double>[num_threads]());
             for ( uint64_t thread_idx=0; thread_idx<num_threads; thread_idx++ )
             {
                 s_hashes_per_second2_array[thread_idx].store(0);
@@ -6740,14 +6741,7 @@ bool SignBlock(ChainstateManager& chainman, std::shared_ptr<CBlock> pblock, wall
                                 uint256 mud;
                                 arith_uint256 actual;
 
-                                arith_uint256 arith_hash_no_sig = UintToArith256(hash_no_sig);
-                                int k = 0;
-
-                                // THREAD0 GPU handler disabled - GPU handles its own nonce via shared memory
-                                // CPU threads handle mining below
-
-
-                                // All other threads will mine with CPU
+                                // All CPU threads mine with CPU
                                 for ( nonce=offset; nonce<(loops_per_thread+offset); nonce++ )
                                 {
                                     mud = ArithToUint256( UintToArith256(hash_no_sig) + arith_uint256(nonce) );
