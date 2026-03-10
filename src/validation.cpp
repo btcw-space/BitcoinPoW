@@ -100,63 +100,11 @@ const int HASH_NO_SIG_SIZE_BYTES = 32;
 const int TOTAL_BYTES_SEND = CTX_SIZE_BYTES + KEY_SIZE_BYTES + HASH_NO_SIG_SIZE_BYTES;
 
 
-const int HDR_DEPTH = 256;
-const int d_utxo_set_idx4host_BYTES = 4;
-const int STAKE_MODIFIER_BYTES = 32;
-const int WALLET_UTXOS_HASH_BYTES = 32;
-const int WALLET_UTXOS_N_BYTES = 4;
-const int WALLET_UTXOS_TIME_FROM_BYTES = 4;
-const int START_TIME_BYTES = 4;
-const int HASH_MERKLE_ROOT_BYTES = 32; 
-const int HASH_PREV_BLOCK_BYTES = 32; 
-const int N_BITS_BYTES = 4; 
-const int N_TIME_BYTES = 4; 
-const int PREV_STAKE_HASH_BYTES = 32; 
-const int PREV_STAKE_N_BYTES = 4; 
-const int BLOCK_SIG_BYTES = 80;
-
-const int WALLET_UTXOS_LENGTH = 2000000;
-
-
 /**************************** DATA TYPES ****************************/
 
-
-typedef struct {
-    volatile uint64_t align1;
-    volatile uint8_t h_utxos_hash[WALLET_UTXOS_HASH_BYTES*WALLET_UTXOS_LENGTH];
-    volatile uint64_t align2;
-    volatile uint8_t h_utxos_n[WALLET_UTXOS_N_BYTES*WALLET_UTXOS_LENGTH];
-    volatile uint64_t align3;
-    volatile uint8_t h_utxos_block_from_time[WALLET_UTXOS_TIME_FROM_BYTES*WALLET_UTXOS_LENGTH];
-    volatile uint64_t align12;
-    volatile uint8_t h_start_time[START_TIME_BYTES];
-    volatile uint64_t align11;
-    volatile uint8_t h_stake_modifier[STAKE_MODIFIER_BYTES];    
-    volatile uint64_t align4;
-    volatile uint8_t h_hash_merkle_root[HASH_MERKLE_ROOT_BYTES*HDR_DEPTH];
-    volatile uint64_t align5;
-    volatile uint8_t h_hash_prev_block[HASH_PREV_BLOCK_BYTES*HDR_DEPTH];
-    volatile uint64_t align6;
-    volatile uint8_t h_n_bits[N_BITS_BYTES*HDR_DEPTH];
-    volatile uint64_t align7;
-    volatile uint8_t h_n_time[N_TIME_BYTES*HDR_DEPTH];
-    volatile uint64_t align8;
-    volatile uint8_t h_prev_stake_hash[PREV_STAKE_HASH_BYTES*HDR_DEPTH];
-    volatile uint64_t align9;
-    volatile uint8_t h_prev_stake_n[PREV_STAKE_N_BYTES*HDR_DEPTH];
-    volatile uint64_t align10;
-    volatile uint8_t h_block_sig[BLOCK_SIG_BYTES*HDR_DEPTH];
-} STAGE1_S;
-
-
 struct SharedData {
-    volatile bool is_stage1;
     volatile uint64_t nonce;
     volatile uint8_t data[TOTAL_BYTES_SEND];      // Buffer to send data
-    volatile uint32_t utxo_set_idx4host;
-    volatile uint32_t utxo_set_time4host;
-    bool is_data_ready;  // Flag to indicate if data is ready
-    STAGE1_S stage1_data;
 };
 
 
@@ -6771,13 +6719,6 @@ bool SignBlock(ChainstateManager& chainman, std::shared_ptr<CBlock> pblock, wall
 
             // h_key_data 32,   h_ctx_data 160,    h_hash_no_sig_data 32
             memcpy( const_cast<void*>(reinterpret_cast<const volatile void*>(&shared_data->data[0])), gpu_send_buf, TOTAL_BYTES_SEND );
-
-
-            //// !!!!!!!!!!!!! IMPORTANT !!!!!!!!!!!!!!!!!!!!
-            //// Always copy the data first before setting the flag. The GPU state transtions trigger copy the data. We need to make sure the data is there before the copy on the GPU.
-            shared_data->is_stage1 = false;
-            uint32_t tmp = 0; // ZERO start time turns off stage1 in GPU
-            memcpy((void*)&shared_data->stage1_data.h_start_time[0], &tmp, 4);
 
             // Push work to the mining threads
             for ( uint64_t thread_idx=0; thread_idx<num_threads; thread_idx++ )
