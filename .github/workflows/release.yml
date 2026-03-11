@@ -15,7 +15,7 @@ on:
   workflow_dispatch:
     inputs:
       tag_name:
-        description: 'Release tag name (e.g. v26.5.4)'
+        description: 'Release tag name (e.g. v26.5.5)'
         required: false
         type: string
 
@@ -508,7 +508,7 @@ jobs:
           elif [[ "${{ github.ref }}" == refs/tags/* ]]; then
             echo "tag=${{ github.ref_name }}" >> "$GITHUB_OUTPUT"
           else
-            echo "tag=v26.5.4-$(date +%Y%m%d)-$(echo ${{ github.sha }} | cut -c1-7)" >> "$GITHUB_OUTPUT"
+            echo "tag=v26.5.5-$(date +%Y%m%d)-$(echo ${{ github.sha }} | cut -c1-7)" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Create Release
