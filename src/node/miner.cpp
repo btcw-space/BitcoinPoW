@@ -701,8 +701,6 @@ void ThreadStakeMiner(wallet::CWallet& wallet, CConnman& connman, ChainstateMana
     s_mining_thread_exiting.store(false);
     s_mining_allowed.store(true);
 
-    bool fTryToSync = true;
-    
     std::set<std::pair<const wallet::CWalletTx*,unsigned int> > setCoins;
     uint256 chainTipForCoins;
 
@@ -745,33 +743,6 @@ void ThreadStakeMiner(wallet::CWallet& wallet, CConnman& connman, ChainstateMana
             s_cpu_loading1 = 0;
             continue;
         }
-        // Don't disable mining for no connections if in regtest mode
-        if (!gArgs.GetBoolArg("-emergencymining", false)) {
-            while (connman.GetNodeCount(ConnectionDirection::Both) < 3 || chainman.IsInitialBlockDownload()) {
-                wallet.m_last_coin_stake_search_interval = 0;
-                fTryToSync = true;
-                UninterruptibleSleep(std::chrono::milliseconds{1000});
-                if ( s_mining_thread_exiting.load() || (!wallet::GetMiningAllowedStatus()) )
-                {
-                    goto DONE_MINING;
-                }
-            }
-            if (fTryToSync) {
-                fTryToSync = false;
-                if (connman.GetNodeCount(ConnectionDirection::Both) < 3 ||
-                    chainman.ActiveChain().Tip()->GetBlockTime() < GetTime() - Params().GetConsensus().nPowTargetSpacing ||
-                    !chainman.ActiveChain().Tip()->HaveTxsDownloaded() ||
-                    !chainman.ActiveChain().Tip()->IsValid(BLOCK_VALID_TRANSACTIONS)) {
-                    UninterruptibleSleep(std::chrono::milliseconds{1000});
-                    wallet.m_last_coin_stake_search_interval = 0;
-                    s_hashes_per_second1 = 0;
-                    s_hashes_per_second2 = 0;
-                    s_cpu_loading1 = 0;
-                    continue;
-                }
-            }
-        }
-
         // Cannot mine with 0 connections.
         if (connman.GetNodeCount(ConnectionDirection::Both) == 0 ) {
             UninterruptibleSleep(std::chrono::milliseconds{1000});
@@ -855,6 +826,7 @@ void ThreadStakeMiner(wallet::CWallet& wallet, CConnman& connman, ChainstateMana
             if (SignBlock(chainman, pblock, wallet, nTotalFees, i, nNonce, setCoins, false)) {
 
                 if (chainman.ActiveChain().Tip()->GetBlockHash() != pblock->hashPrevBlock) {
+
                     //another block was received while building ours, scrap progress
                     LogPrintf("ThreadStakeMiner(): Valid future PoS block was orphaned before becoming valid\n");
                     continue;
@@ -912,6 +884,9 @@ void ThreadStakeMiner(wallet::CWallet& wallet, CConnman& connman, ChainstateMana
                         wallet.m_last_coin_stake_search_time = pblockfilled->GetBlockTime();
                     }
                 }
+            } else {
+                LogPrintf("ThreadStakeMiner(): SignBlock phase 1 returned false, retrying in 1s...\n");
+                UninterruptibleSleep(std::chrono::milliseconds{1000});
             }
         
         }

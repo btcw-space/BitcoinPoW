@@ -4523,17 +4523,15 @@ bool CWallet::CreateCoinStake(ChainstateManager& chainman, const CWallet& wallet
         return false;
 
     if(stakeCache.size() > setCoins.size() + 100){
-        //Determining if the cache is still valid is harder than just clearing it when it gets too big, so instead just clear it
-        //when it has more than 100 entries more than the actual setCoins.
         stakeCache.clear();
     }
 
     for(const std::pair<const CWalletTx*,unsigned int> &pcoin : setCoins)
     {
-        //boost::this_thread::interruption_point();
         COutPoint prevoutStake = COutPoint(pcoin.first->GetHash(), pcoin.second);
-        CacheKernel(stakeCache, prevoutStake, pindexPrev, chainman.ActiveChainstate().CoinsTip()); //this will do a 2 disk loads per op
+        CacheKernel(stakeCache, prevoutStake, pindexPrev, chainman.ActiveChainstate().CoinsTip());
     }
+    LogPrintf("CreateCoinStake: stakeCache size=%d after caching %d coins\n", stakeCache.size(), setCoins.size());
 
     int64_t nCredit = 0;
     CScript scriptPubKeyKernel;
@@ -4542,7 +4540,7 @@ bool CWallet::CreateCoinStake(ChainstateManager& chainman, const CWallet& wallet
     LegacyScriptPubKeyMan* spk_man = GetLegacyScriptPubKeyMan();
     if (!spk_man)
     {
-        LogPrint(BCLog::COINSTAKE, "CreateCoinStake : failed to get signing provider\n");
+        LogPrintf("CreateCoinStake: FAILED - no LegacyScriptPubKeyMan (wallet is descriptor-only?)\n");
         return false;
     }
 
@@ -4570,60 +4568,63 @@ bool CWallet::CreateCoinStake(ChainstateManager& chainman, const CWallet& wallet
                     {
                         //===========THREAD Work BEGIN===========
                         int64_t start_time = GetTime<std::chrono::milliseconds>().count();
-                        int idx_get_to = 0;
                         bool is_found = false;
-                        // Chunk up the utxos across all threads
-                        int coins_per_thread = setCoins.size()/num_threads;
-                        int k = 0;
 
 
                         // Create a random engine
                         std::random_device rd;
                         std::mt19937 gen(rd());
                         
-                        // Define a uniform distribution between 0 and 100
                         std::uniform_int_distribution<> dist(0, setCoins.size()-1);
                         
-                        // Generate and print a random number
                         int rand_utxo_idx = dist(gen);
-                        
+                        int total_coins = setCoins.size();
 
-                        for (const std::pair<const CWalletTx*,unsigned int> &coin : setCoins)                   
+                        // Wrap-around: iterate from rand_utxo_idx to end, then begin to rand_utxo_idx
+                        auto startIt = setCoins.begin();
+                        std::advance(startIt, rand_utxo_idx);
+
+                        auto checkCoin = [&](const std::pair<const CWalletTx*,unsigned int>& coin) -> bool {
+                            COutPoint prevoutStake = COutPoint(coin.first->GetHash(), coin.second);
+                            is_found = CheckKernel(pindexPrev, nBits, nTimeBlock, nNonce, prevoutStake, chainman.ActiveChainstate().CoinsTip(), stakeCache);
+                            if ( is_found )
+                            {
+                                std::cout << "\n\n=====May 8, 2025====="<< std::endl;
+                                std::cout << "\n\n=====Random rand_utxo=====: " << rand_utxo_idx << std::endl;
+                                printf("CheckKernel IDX:%d\n", idx[thread_idx] );
+                                std::cout << "coin.first->GetHash(): " << coin.first->GetHash().ToString() << std::endl;
+                                printf("coin.second:%d\n", coin.second );
+                                pcoin[thread_idx].first = const_cast<wallet::CWalletTx*>(coin.first);
+                                pcoin[thread_idx].second = coin.second;
+                                std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+                                return true;
+                            }
+                            idx[thread_idx]++;
+                            return false;
+                        };
+
+                        // First pass: rand_utxo_idx to end
+                        for (auto it = startIt; it != setCoins.end(); ++it)
                         {
-                            // Go to the index for this random number
-                            if ( idx_get_to < rand_utxo_idx)
+                            if (checkCoin(*it)) break;
+                        }
+                        // Second pass (wrap-around): begin to rand_utxo_idx
+                        if (!is_found)
+                        {
+                            for (auto it = setCoins.begin(); it != startIt; ++it)
                             {
-                                idx_get_to++;
-                                continue;
+                                if (checkCoin(*it)) break;
                             }
-
-                           
-                            // all threads can do this
-                            {
-                                COutPoint prevoutStake = COutPoint(coin.first->GetHash(), coin.second);
-                                is_found = CheckKernel(pindexPrev, nBits, nTimeBlock, nNonce, prevoutStake, chainman.ActiveChainstate().CoinsTip(), stakeCache);
-                                if ( is_found ) 
-                                {
-                                    std::cout << "\n\n=====May 8, 2025====="<< std::endl;
-                                    std::cout << "\n\n=====Random rand_utxo=====: " << rand_utxo_idx << std::endl;
-                                    printf("CheckKernel IDX:%d\n", idx[thread_idx] );
-                                    std::cout << "coin.first->GetHash(): " << coin.first->GetHash().ToString() << std::endl;  
-                                    printf("coin.second:%d\n", coin.second );
-                                    pcoin[thread_idx].first = const_cast<wallet::CWalletTx*>(coin.first);
-                                    pcoin[thread_idx].second = coin.second;
-                                    std::this_thread::sleep_for(std::chrono::milliseconds(1000));
-                                    break;          
-                                }
-                            }
-
-                            idx[thread_idx]++; // all threads will increment
-
                         }
                         //===========THREAD Work END===========
                     }
+                    catch(const std::exception& ex)
+                    {
+                        LogPrintf("CreateCoinStake: thread exception: %s\n", ex.what());
+                    }
                     catch(...)
                     {
-                        // error happened, exit out of thread
+                        LogPrintf("CreateCoinStake: thread unknown exception\n");
                     }
 
                     work_done.exchange(true, std::memory_order_release);
@@ -4645,6 +4646,8 @@ bool CWallet::CreateCoinStake(ChainstateManager& chainman, const CWallet& wallet
 
     s_coin_loop_prev_max_idx1.store(num_thread_loops);
 
+    LogPrintf("CreateCoinStake: thread pool done, checked %d coins, stakeCache size=%d\n", num_thread_loops, stakeCache.size());
+
     bool is_found = false;
     int thread_idx = 0;
     // Look to see if a solution was found in one of the threads.
@@ -4656,7 +4659,9 @@ bool CWallet::CreateCoinStake(ChainstateManager& chainman, const CWallet& wallet
             thread_idx = n;
             break; // only need one solution
         }
-    }    
+    }
+
+    LogPrintf("CreateCoinStake: is_found=%d, setCoins=%d\n", is_found, setCoins.size());
 
     // Loop of 1 to allow breaks
     for ( int n=0; n<1; n++ )
