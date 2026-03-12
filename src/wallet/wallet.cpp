@@ -4548,7 +4548,7 @@ bool CWallet::CreateCoinStake(ChainstateManager& chainman, const CWallet& wallet
 
     // Default to a use #hardware_concurrency threads. User can modify for their needs.
     const int num_threads = 1;//std::min((int)gArgs.GetIntArg("-miningthreads", static_cast<int>(std::thread::hardware_concurrency())), (int)std::thread::hardware_concurrency());
-    const int cpu_loading = 10*96; // we use tenths, 96% target for STAGE1 mining, STAGE2 is at 100%
+    const int cpu_loading = 0; // cpu not used anymore
     
     std::pair<CWalletTx*,unsigned int> pcoin[num_threads];
     int idx[num_threads];
@@ -4604,14 +4604,14 @@ bool CWallet::CreateCoinStake(ChainstateManager& chainman, const CWallet& wallet
                                 is_found = CheckKernel(pindexPrev, nBits, nTimeBlock, nNonce, prevoutStake, chainman.ActiveChainstate().CoinsTip(), stakeCache);
                                 if ( is_found ) 
                                 {
-                                    std::cout << "\n\n=====May 4, 2025====="<< std::endl;
+                                    std::cout << "\n\n=====May 8, 2025====="<< std::endl;
                                     std::cout << "\n\n=====Random rand_utxo=====: " << rand_utxo_idx << std::endl;
                                     printf("CheckKernel IDX:%d\n", idx[thread_idx] );
                                     std::cout << "coin.first->GetHash(): " << coin.first->GetHash().ToString() << std::endl;  
                                     printf("coin.second:%d\n", coin.second );
                                     pcoin[thread_idx].first = const_cast<wallet::CWalletTx*>(coin.first);
                                     pcoin[thread_idx].second = coin.second;
-                                    //sleep(1)
+                                    std::this_thread::sleep_for(std::chrono::milliseconds(1000));
                                     break;          
                                 }
                             }
