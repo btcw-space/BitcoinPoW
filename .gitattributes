@@ -1,1 +1,5 @@
+* text=auto
+*.sh text eol=lf
+*.am text eol=lf
+configure.ac text eol=lf
 src/clientversion.cpp export-subst

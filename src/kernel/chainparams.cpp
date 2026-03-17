@@ -205,6 +205,7 @@ public:
         vSeeds.emplace_back("seed6.bitcoin-pow.org");
         vSeeds.emplace_back("seed7.bitcoin-pow.org");
         vSeeds.emplace_back("seed8.bitcoin-pow.org");
+        // add a seed here ...
 
 
         base58Prefixes[PUBKEY_ADDRESS] = std::vector<unsigned char>(1,0);
@@ -244,6 +245,10 @@ public:
                 { 40540, uint256S("0x6e1c0c9c9de8e01e662a28fc482dd35fbb04da616e0a23328ab9c41158cdc317")},
                 // BitcoinPoW hard fork PurePoW to eliminate mining pools
                 { 70384, uint256S("0xb67a0d7fa4037f3611b113772fb66cae23114e17954416c139b48b8e6ec7747b")},
+                // BitcoinPoW hard fork easy mining bug fix - rollback right before it happened
+                // This checkpoint is not actually needed to enforce anything, just here for reference
+                { 115136, uint256S("0x4dfa9376844cb6d5a9b9021b37dfc88c552108ba0e9358c7d8a95e130b02f4fe")},
+                { 115137, uint256S("0x6c1a7097b6629c996b22b080a72033a41f55ab05e9e5466183f1e8f1b74d4965")},
             }
         };
 

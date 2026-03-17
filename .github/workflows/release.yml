@@ -1,0 +1,581 @@
+# Copyright (c) 2025 The Bitcoin PoW Core developers
+# Distributed under the MIT software license, see the accompanying
+# file COPYING or http://www.opensource.org/licenses/mit-license.php.
+
+name: Release Build
+
+on:
+  # Trigger on version tags
+  push:
+    tags:
+      - 'v*'
+    branches:
+      - 'main'
+      - '26.x_unified'
+  # Allow manual trigger from Actions tab
+  workflow_dispatch:
+    inputs:
+      tag_name:
+        description: 'Release tag name (e.g. v26.5.5)'
+        required: false
+        type: string
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  MAKEJOBS: '-j4'
+  PROJECT_NAME: 'BitcoinPoW'
+
+jobs:
+  # ============================================================
+  # Linux x86_64 — native build on Ubuntu
+  # ============================================================
+  linux-x86_64:
+    name: 'Linux x86_64'
+    runs-on: ubuntu-22.04
+    timeout-minutes: 120
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Fix script permissions and line endings
+        run: |
+          find . -name '*.sh' -exec perl -i -pe 's/\r$//' {} \;
+          chmod +x autogen.sh src/secp256k1/autogen.sh src/minisketch/autogen.sh 2>/dev/null || true
+          chmod +x depends/config.guess depends/config.sub share/genbuild.sh 2>/dev/null || true
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential libtool autotools-dev automake pkg-config \
+            bsdmainutils curl ca-certificates ccache python3 \
+            libevent-dev libboost-dev libsqlite3-dev libdb++-dev \
+            libminiupnpc-dev libnatpmp-dev libzmq3-dev \
+            libqt5gui5 libqt5core5a libqt5dbus5 qttools5-dev \
+            qttools5-dev-tools qtwayland5 libqrencode-dev
+
+      - name: Set Ccache directory
+        run: echo "CCACHE_DIR=${RUNNER_TEMP}/ccache_dir" >> "$GITHUB_ENV"
+
+      - name: Restore Ccache cache
+        uses: actions/cache/restore@v4
+        with:
+          path: ${{ env.CCACHE_DIR }}
+          key: linux-x86_64-ccache-${{ github.run_id }}
+          restore-keys: linux-x86_64-ccache-
+
+      - name: Build
+        run: |
+          ./autogen.sh
+          ./configure --with-gui=qt5 \
+                      --with-incompatible-bdb \
+                      BDB_CFLAGS="-I/usr/include" \
+                      BDB_LIBS="/usr/lib/x86_64-linux-gnu/libdb_cxx-5.3.a" \
+                      --enable-reduce-exports \
+                      --disable-bench \
+                      --disable-tests \
+                      --disable-gui-tests \
+                      --disable-fuzz-binary
+          make ${{ env.MAKEJOBS }}
+
+      - name: Create package
+        run: |
+          DISTNAME="${{ env.PROJECT_NAME }}-${{ github.ref_name }}-x86_64-linux-gnu"
+          mkdir -p "${DISTNAME}/bin"
+          strip src/bitcoind src/bitcoin-cli src/bitcoin-tx src/bitcoin-util src/bitcoin-wallet src/qt/bitcoin-qt 2>/dev/null || true
+          cp src/bitcoind src/bitcoin-cli src/bitcoin-tx src/bitcoin-util src/bitcoin-wallet "${DISTNAME}/bin/" 2>/dev/null || true
+          cp src/qt/bitcoin-qt "${DISTNAME}/bin/" 2>/dev/null || true
+          cp README.md COPYING "${DISTNAME}/" 2>/dev/null || true
+          cp share/examples/bitcoin.conf "${DISTNAME}/" 2>/dev/null || true
+          tar czf "${DISTNAME}.tar.gz" "${DISTNAME}"
+          sha256sum "${DISTNAME}.tar.gz" > "${DISTNAME}.tar.gz.sha256"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-x86_64
+          path: |
+            ${{ env.PROJECT_NAME }}-*-x86_64-linux-gnu.tar.gz
+            ${{ env.PROJECT_NAME }}-*-x86_64-linux-gnu.tar.gz.sha256
+
+      - name: Save Ccache cache
+        uses: actions/cache/save@v4
+        if: always()
+        with:
+          path: ${{ env.CCACHE_DIR }}
+          key: linux-x86_64-ccache-${{ github.run_id }}
+
+  # ============================================================
+  # Windows x64 — native MSVC build with Qt GUI
+  # ============================================================
+  windows-x64:
+    name: 'Windows x64 (MSVC)'
+    runs-on: windows-2022
+    timeout-minutes: 240
+
+    env:
+      CCACHE_MAXSIZE: '200M'
+      CI_CCACHE_VERSION: '4.7.5'
+      CI_QT_CONF: '-release -silent -opensource -confirm-license -opengl desktop -static -static-runtime -mp -qt-zlib -qt-pcre -qt-libpng -nomake examples -nomake tests -nomake tools -no-angle -no-dbus -no-gif -no-gtk -no-ico -no-icu -no-libjpeg -no-libudev -no-sql-sqlite -no-sql-odbc -no-sqlite -no-vulkan -skip qt3d -skip qtactiveqt -skip qtandroidextras -skip qtcharts -skip qtconnectivity -skip qtdatavis3d -skip qtdeclarative -skip doc -skip qtdoc -skip qtgamepad -skip qtgraphicaleffects -skip qtimageformats -skip qtlocation -skip qtlottie -skip qtmacextras -skip qtmultimedia -skip qtnetworkauth -skip qtpurchasing -skip qtquick3d -skip qtquickcontrols -skip qtquickcontrols2 -skip qtquicktimeline -skip qtremoteobjects -skip qtscript -skip qtscxml -skip qtsensors -skip qtserialbus -skip qtserialport -skip qtspeech -skip qtsvg -skip qtvirtualkeyboard -skip qtwayland -skip qtwebchannel -skip qtwebengine -skip qtwebglplugin -skip qtwebsockets -skip qtwebview -skip qtx11extras -skip qtxmlpatterns -no-openssl -no-feature-bearermanagement -no-feature-printdialog -no-feature-printer -no-feature-printpreviewdialog -no-feature-printpreviewwidget -no-feature-sql -no-feature-sqlmodel -no-feature-textbrowser -no-feature-textmarkdownwriter -no-feature-textodfwriter -no-feature-xml'
+      CI_QT_DIR: 'qt-everywhere-src-5.15.14'
+      CI_QT_URL: 'https://download.qt.io/archive/qt/5.15/5.15.14/single/qt-everywhere-opensource-src-5.15.14.zip'
+      PYTHONUTF8: 1
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Fix Visual Studio installation
+        run: |
+          Set-Location "C:\Program Files (x86)\Microsoft Visual Studio\Installer\"
+          $InstallPath = "C:\Program Files\Microsoft Visual Studio\2022\Enterprise"
+          $componentsToRemove= @(
+            "Microsoft.VisualStudio.Component.VC.14.37.17.7.ARM.Spectre"
+            "Microsoft.VisualStudio.Component.VC.14.37.17.7.ARM"
+            "Microsoft.VisualStudio.Component.VC.14.37.17.7.ARM64.Spectre"
+            "Microsoft.VisualStudio.Component.VC.14.37.17.7.ARM64"
+            "Microsoft.VisualStudio.Component.VC.14.37.17.7.ATL.ARM.Spectre"
+            "Microsoft.VisualStudio.Component.VC.14.37.17.7.ATL.ARM"
+            "Microsoft.VisualStudio.Component.VC.14.37.17.7.ATL.ARM64.Spectre"
+            "Microsoft.VisualStudio.Component.VC.14.37.17.7.ATL.ARM64"
+            "Microsoft.VisualStudio.Component.VC.14.37.17.7.ATL.Spectre"
+            "Microsoft.VisualStudio.Component.VC.14.37.17.7.ATL"
+            "Microsoft.VisualStudio.Component.VC.14.37.17.7.MFC.ARM.Spectre"
+            "Microsoft.VisualStudio.Component.VC.14.37.17.7.MFC.ARM"
+            "Microsoft.VisualStudio.Component.VC.14.37.17.7.MFC.ARM64.Spectre"
+            "Microsoft.VisualStudio.Component.VC.14.37.17.7.MFC.ARM64"
+            "Microsoft.VisualStudio.Component.VC.14.37.17.7.MFC.Spectre"
+            "Microsoft.VisualStudio.Component.VC.14.37.17.7.MFC"
+            "Microsoft.VisualStudio.Component.VC.14.37.17.7.x86.x64.Spectre"
+            "Microsoft.VisualStudio.Component.VC.14.37.17.7.x86.x64"
+            "Microsoft.VisualStudio.Component.VC.14.38.17.8.ARM"
+            "Microsoft.VisualStudio.Component.VC.14.38.17.8.ARM.Spectre"
+            "Microsoft.VisualStudio.Component.VC.14.38.17.8.ARM64"
+            "Microsoft.VisualStudio.Component.VC.14.38.17.8.ARM64.Spectre"
+            "Microsoft.VisualStudio.Component.VC.14.38.17.8.ATL"
+            "Microsoft.VisualStudio.Component.VC.14.38.17.8.ATL.ARM"
+            "Microsoft.VisualStudio.Component.VC.14.38.17.8.ATL.ARM.Spectre"
+            "Microsoft.VisualStudio.Component.VC.14.38.17.8.ATL.ARM64"
+            "Microsoft.VisualStudio.Component.VC.14.38.17.8.ATL.ARM64.Spectre"
+            "Microsoft.VisualStudio.Component.VC.14.38.17.8.ATL.Spectre"
+            "Microsoft.VisualStudio.Component.VC.14.38.17.8.MFC"
+            "Microsoft.VisualStudio.Component.VC.14.38.17.8.MFC.ARM"
+            "Microsoft.VisualStudio.Component.VC.14.38.17.8.MFC.ARM.Spectre"
+            "Microsoft.VisualStudio.Component.VC.14.38.17.8.MFC.ARM64"
+            "Microsoft.VisualStudio.Component.VC.14.38.17.8.MFC.ARM64.Spectre"
+            "Microsoft.VisualStudio.Component.VC.14.38.17.8.MFC.Spectre"
+            "Microsoft.VisualStudio.Component.VC.14.38.17.8.x86.x64"
+            "Microsoft.VisualStudio.Component.VC.14.38.17.8.x86.x64.Spectre"
+          )
+          [string]$workloadArgs = $componentsToRemove | ForEach-Object {" --remove " +  $_}
+          $Arguments = ('/c', "vs_installer.exe", 'modify', '--installPath', "`"$InstallPath`"",$workloadArgs, '--quiet', '--norestart', '--nocache')
+          $process = Start-Process -FilePath cmd.exe -ArgumentList $Arguments -Wait -PassThru -WindowStyle Hidden
+          $process = Start-Process -FilePath cmd.exe -ArgumentList $Arguments -Wait -PassThru -WindowStyle Hidden
+
+      - name: Configure Developer Command Prompt for Microsoft Visual C++
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: x64
+
+      - name: Check MSBuild and Qt
+        run: |
+          msbuild -version | Out-File -FilePath "$env:GITHUB_WORKSPACE\msbuild_version"
+          Get-Content -Path "$env:GITHUB_WORKSPACE\msbuild_version"
+          $env:CI_QT_URL | Out-File -FilePath "$env:GITHUB_WORKSPACE\qt_url"
+          $env:CI_QT_CONF | Out-File -FilePath "$env:GITHUB_WORKSPACE\qt_conf"
+
+      - name: Restore static Qt cache
+        id: static-qt-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: C:\Qt_static
+          key: ${{ github.job }}-static-qt-${{ hashFiles('msbuild_version', 'qt_url', 'qt_conf') }}
+
+      - name: Restore extracted Qt source cache
+        id: qt-src-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: C:\qt-src
+          key: ${{ github.job }}-qt-src-${{ env.CI_QT_DIR }}
+
+      - name: Build static Qt. Download
+        if: steps.static-qt-cache.outputs.cache-hit != 'true' && steps.qt-src-cache.outputs.cache-hit != 'true'
+        shell: cmd
+        run: |
+          curl --fail --location --output C:\qt-src.zip %CI_QT_URL% || (
+            echo Primary URL failed, trying archive fallback...
+            curl --fail --location --output C:\qt-src.zip https://download.qt.io/archive/qt/5.15/5.15.14/single/qt-everywhere-opensource-src-5.15.14.zip
+          )
+          choco install --yes --no-progress jom
+
+      - name: Build static Qt. Expand source archive
+        if: steps.static-qt-cache.outputs.cache-hit != 'true' && steps.qt-src-cache.outputs.cache-hit != 'true'
+        shell: cmd
+        run: 7z x C:\qt-src.zip -oC:\ -y -bb1
+
+      - name: Build static Qt. Rename source directory
+        if: steps.static-qt-cache.outputs.cache-hit != 'true' && steps.qt-src-cache.outputs.cache-hit != 'true'
+        run: Rename-Item -Path "C:\$env:CI_QT_DIR" -NewName "C:\qt-src"
+
+      - name: Save extracted Qt source cache
+        if: steps.static-qt-cache.outputs.cache-hit != 'true' && steps.qt-src-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: C:\qt-src
+          key: ${{ github.job }}-qt-src-${{ env.CI_QT_DIR }}
+
+      - name: Build static Qt. Create build directory
+        if: steps.static-qt-cache.outputs.cache-hit != 'true'
+        run: New-Item -ItemType Directory -Path "C:\qt-src\build" -Force
+
+      - name: Build static Qt. Configure
+        if: steps.static-qt-cache.outputs.cache-hit != 'true'
+        working-directory: C:\qt-src\build
+        shell: cmd
+        run: ..\configure %CI_QT_CONF% -prefix C:\Qt_static
+
+      - name: Build static Qt. Build
+        if: steps.static-qt-cache.outputs.cache-hit != 'true'
+        working-directory: C:\qt-src\build
+        shell: cmd
+        run: jom
+
+      - name: Build static Qt. Install
+        if: steps.static-qt-cache.outputs.cache-hit != 'true'
+        working-directory: C:\qt-src\build
+        shell: cmd
+        run: jom install
+
+      - name: Save static Qt cache
+        if: steps.static-qt-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: C:\Qt_static
+          key: ${{ github.job }}-static-qt-${{ hashFiles('msbuild_version', 'qt_url', 'qt_conf') }}
+
+      - name: Ccache installation cache
+        id: ccache-installation-cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            C:\ProgramData\chocolatey\lib\ccache
+            C:\ProgramData\chocolatey\bin\ccache.exe
+            C:\ccache\cl.exe
+          key: ${{ github.job }}-ccache-installation-${{ env.CI_CCACHE_VERSION }}
+
+      - name: Install Ccache
+        if: steps.ccache-installation-cache.outputs.cache-hit != 'true'
+        run: |
+          choco install --yes --no-progress ccache --version=$env:CI_CCACHE_VERSION
+          New-Item -ItemType Directory -Path "C:\ccache"
+          Copy-Item -Path "$env:ChocolateyInstall\lib\ccache\tools\ccache-$env:CI_CCACHE_VERSION-windows-x86_64\ccache.exe" -Destination "C:\ccache\cl.exe"
+
+      - name: Restore Ccache cache
+        id: ccache-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: ~/AppData/Local/ccache
+          key: ${{ github.job }}-ccache-${{ github.run_id }}
+          restore-keys: ${{ github.job }}-ccache-
+
+      - name: Using vcpkg with MSBuild
+        run: |
+          Set-Location "$env:VCPKG_INSTALLATION_ROOT"
+          $vcpkgHead = (git rev-parse HEAD).Trim()
+          Write-Output "Runner vcpkg HEAD: $vcpkgHead"
+          $jsonPath = "$env:GITHUB_WORKSPACE\build_msvc\vcpkg.json"
+          $json = Get-Content $jsonPath -Raw
+          $json = $json -replace '"builtin-baseline"\s*:\s*"[a-f0-9]+"', "`"builtin-baseline`": `"$vcpkgHead`""
+          Set-Content -Path $jsonPath -Value $json -NoNewline
+          Write-Output "Updated vcpkg.json baseline to $vcpkgHead"
+          Add-Content -Path "triplets\x64-windows-static.cmake" -Value "set(VCPKG_BUILD_TYPE release)"
+          vcpkg --vcpkg-root "$env:VCPKG_INSTALLATION_ROOT" integrate install
+          $vcpkgHead | Out-File -FilePath "$env:GITHUB_WORKSPACE\vcpkg_commit"
+          Get-Content -Path "$env:GITHUB_WORKSPACE\vcpkg_commit"
+
+      - name: vcpkg tools cache
+        uses: actions/cache@v4
+        with:
+          path: C:/vcpkg/downloads/tools
+          key: ${{ github.job }}-vcpkg-tools
+
+      - name: vcpkg binary cache
+        uses: actions/cache@v4
+        with:
+          path: ~/AppData/Local/vcpkg/archives
+          key: ${{ github.job }}-vcpkg-binary-${{ hashFiles('vcpkg_commit', 'msbuild_version', 'build_msvc/vcpkg.json') }}
+
+      - name: Generate project files
+        run: py -3 build_msvc\msvc-autogen.py
+
+      - name: Build
+        shell: cmd
+        run: |
+          ccache --zero-stats
+          msbuild build_msvc\bitcoin.sln -property:CLToolPath=C:\ccache;CLToolExe=cl.exe;UseMultiToolTask=true;Configuration=Release -maxCpuCount -verbosity:minimal -noLogo "-flp:errorsonly;logfile=build_errors.log"
+          set BUILD_EXIT=%ERRORLEVEL%
+          echo.
+          echo ========== BUILD ERRORS (if any) ==========
+          if exist build_errors.log (type build_errors.log) else (echo No error log found)
+          echo =============================================
+          exit /b %BUILD_EXIT%
+
+      - name: Ccache stats
+        run: ccache --show-stats
+
+      - name: Save Ccache cache
+        uses: actions/cache/save@v4
+        if: always()
+        with:
+          path: ~/AppData/Local/ccache
+          key: ${{ github.job }}-ccache-${{ github.run_id }}
+
+      - name: Locate built executables
+        shell: powershell
+        run: |
+          Write-Host "=== Searching for built executables ==="
+          $exeNames = @("bitcoind.exe", "bitcoin-cli.exe", "bitcoin-tx.exe",
+                        "bitcoin-util.exe", "bitcoin-wallet.exe", "bitcoin-qt.exe")
+          foreach ($exe in $exeNames) {
+            $found = Get-ChildItem -Path "build_msvc" -Filter $exe -Recurse -ErrorAction SilentlyContinue
+            if ($found) {
+              foreach ($f in $found) { Write-Host "  Found: $($f.FullName) ($([math]::Round($f.Length/1MB, 1)) MB)" }
+            } else {
+              Write-Host "  NOT FOUND: $exe"
+            }
+          }
+
+      - name: Create package
+        run: |
+          $DISTNAME = "${{ env.PROJECT_NAME }}-${{ github.ref_name }}-win64"
+          New-Item -ItemType Directory -Path $DISTNAME -Force
+
+          $exeNames = @(
+            "bitcoind.exe", "bitcoin-cli.exe", "bitcoin-tx.exe",
+            "bitcoin-util.exe", "bitcoin-wallet.exe", "bitcoin-qt.exe"
+          )
+
+          foreach ($exe in $exeNames) {
+            $found = Get-ChildItem -Path "build_msvc" -Filter $exe -Recurse -ErrorAction SilentlyContinue |
+                     Where-Object { $_.DirectoryName -match 'Release' } |
+                     Select-Object -First 1
+            if ($found) {
+              Copy-Item -Path $found.FullName -Destination "$DISTNAME\"
+              Write-Host "Copied $($found.FullName)"
+            } else {
+              Write-Host "WARNING: $exe not found in build_msvc"
+            }
+          }
+
+          Copy-Item -Path "README.md" -Destination "$DISTNAME\" -ErrorAction SilentlyContinue
+          Copy-Item -Path "COPYING" -Destination "$DISTNAME\" -ErrorAction SilentlyContinue
+
+          Write-Host "=== Package contents ==="
+          Get-ChildItem "$DISTNAME" | ForEach-Object {
+            Write-Host "  $($_.Name) ($([math]::Round($_.Length/1MB, 1)) MB)"
+          }
+
+          Compress-Archive -Path "$DISTNAME\*" -DestinationPath "$DISTNAME.zip"
+          $hash = (Get-FileHash -Algorithm SHA256 "$DISTNAME.zip").Hash.ToLower()
+          "$hash  $DISTNAME.zip" | Out-File -FilePath "$DISTNAME.zip.sha256" -Encoding ascii -NoNewline
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-x64
+          path: |
+            ${{ env.PROJECT_NAME }}-*-win64.zip
+            ${{ env.PROJECT_NAME }}-*-win64.zip.sha256
+
+  # ============================================================
+  # macOS ARM64 (Apple Silicon) — native build on M1 runner
+  # ============================================================
+  macos-arm64:
+    name: 'macOS ARM64 (Apple Silicon)'
+    runs-on: macos-14
+    timeout-minutes: 120
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Fix script permissions and line endings
+        run: |
+          find . -name '*.sh' -exec perl -i -pe 's/\r$//' {} \;
+          chmod +x autogen.sh src/secp256k1/autogen.sh src/minisketch/autogen.sh 2>/dev/null || true
+          chmod +x depends/config.guess depends/config.sub share/genbuild.sh 2>/dev/null || true
+
+      - name: Install Homebrew packages
+        env:
+          HOMEBREW_NO_INSTALLED_DEPENDENTS_CHECK: 1
+        run: |
+          brew install automake libtool pkg-config gnu-getopt ccache \
+               boost libevent miniupnpc libnatpmp zeromq qt@5 qrencode \
+               sqlite berkeley-db
+
+      - name: Set Ccache directory
+        run: echo "CCACHE_DIR=${RUNNER_TEMP}/ccache_dir" >> "$GITHUB_ENV"
+
+      - name: Restore Ccache cache
+        uses: actions/cache/restore@v4
+        with:
+          path: ${{ env.CCACHE_DIR }}
+          key: macos-arm64-ccache-${{ github.run_id }}
+          restore-keys: macos-arm64-ccache-
+
+      - name: Build
+        run: |
+          export PATH="/opt/homebrew/opt/qt@5/bin:$PATH"
+          export PKG_CONFIG_PATH="/opt/homebrew/opt/qt@5/lib/pkgconfig:$PKG_CONFIG_PATH"
+          QT5_PREFIX="$(brew --prefix qt@5)"
+          BDB_PREFIX="$(brew --prefix berkeley-db)"
+          ./autogen.sh
+          ./configure --with-gui=qt5 \
+                      --with-incompatible-bdb \
+                      BDB_CFLAGS="-I${BDB_PREFIX}/include" \
+                      BDB_LIBS="-L${BDB_PREFIX}/lib -ldb_cxx" \
+                      --enable-reduce-exports \
+                      --disable-bench \
+                      --disable-tests \
+                      --disable-gui-tests \
+                      --disable-fuzz-binary \
+                      --with-qt-translationdir="${QT5_PREFIX}/translations" \
+                      --with-qt-plugindir="${QT5_PREFIX}/plugins" \
+                      --with-qt-bindir="${QT5_PREFIX}/bin"
+          make ${{ env.MAKEJOBS }}
+
+      - name: Create .app bundle
+        run: |
+          export PATH="/opt/homebrew/opt/qt@5/bin:$PATH"
+          make deploy
+
+      - name: Create package
+        run: |
+          DISTNAME="${{ env.PROJECT_NAME }}-${{ github.ref_name }}-arm64-apple-darwin"
+          mkdir -p "${DISTNAME}"
+
+          echo "=== Checking make deploy output ==="
+          ls -la dist/ 2>/dev/null || echo "No dist/ directory"
+          ls -la *.zip 2>/dev/null || echo "No .zip at top level"
+
+          if [ -d "dist/Bitcoin-Qt.app" ]; then
+            echo "Found fully bundled .app in dist/"
+            cp -R dist/Bitcoin-Qt.app "${DISTNAME}/Bitcoin-Qt.app"
+          else
+            echo "ERROR: dist/Bitcoin-Qt.app not found — make deploy failed to produce a bundled app"
+            exit 1
+          fi
+
+          mkdir -p "${DISTNAME}/bin"
+          for bin in bitcoind bitcoin-cli bitcoin-tx bitcoin-util bitcoin-wallet; do
+            if [ -f "src/${bin}" ]; then
+              strip "src/${bin}" 2>/dev/null || true
+              cp "src/${bin}" "${DISTNAME}/bin/"
+            fi
+          done
+
+          cp README.md COPYING "${DISTNAME}/" 2>/dev/null || true
+          cp share/examples/bitcoin.conf "${DISTNAME}/" 2>/dev/null || true
+
+          echo "=== Package contents ==="
+          find "${DISTNAME}" -type f | head -30
+
+          ditto -c -k --sequesterRsrc --keepParent "${DISTNAME}" "${DISTNAME}.zip"
+          shasum -a 256 "${DISTNAME}.zip" > "${DISTNAME}.zip.sha256"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos-arm64
+          path: |
+            ${{ env.PROJECT_NAME }}-*-arm64-apple-darwin.zip
+            ${{ env.PROJECT_NAME }}-*-arm64-apple-darwin.zip.sha256
+
+      - name: Save Ccache cache
+        uses: actions/cache/save@v4
+        if: always()
+        with:
+          path: ${{ env.CCACHE_DIR }}
+          key: macos-arm64-ccache-${{ github.run_id }}
+
+  # ============================================================
+  # Create GitHub Release with all platform binaries
+  # ============================================================
+  create-release:
+    name: 'Create GitHub Release'
+    needs: [linux-x86_64, windows-x64, macos-arm64]
+    runs-on: ubuntu-22.04
+    # Only create a release on tag pushes or manual dispatch
+    if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: release-artifacts
+          merge-multiple: true
+
+      - name: List release artifacts
+        run: |
+          echo "=== Release artifacts ==="
+          find release-artifacts -type f | sort
+          echo "========================="
+
+      - name: Generate SHA256SUMS
+        run: |
+          cd release-artifacts
+          sha256sum *.tar.gz *.zip *.exe 2>/dev/null | sort -k2 > SHA256SUMS || true
+          echo "=== SHA256SUMS ==="
+          cat SHA256SUMS
+
+      - name: Determine release tag
+        id: tag
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ -n "${{ inputs.tag_name }}" ]; then
+            echo "tag=${{ inputs.tag_name }}" >> "$GITHUB_OUTPUT"
+          elif [[ "${{ github.ref }}" == refs/tags/* ]]; then
+            echo "tag=${{ github.ref_name }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "tag=v26.5.5-$(date +%Y%m%d)-$(echo ${{ github.sha }} | cut -c1-7)" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.tag.outputs.tag }}
+          name: "Bitcoin PoW ${{ steps.tag.outputs.tag }}"
+          body: |
+            ## Bitcoin PoW ${{ steps.tag.outputs.tag }}
+
+            ### Downloads
+
+            | Platform | File |
+            |----------|------|
+            | 🐧 Linux x86_64 | `${{ env.PROJECT_NAME }}-${{ steps.tag.outputs.tag }}-x86_64-linux-gnu.tar.gz` |
+            | 🪟 Windows x64 | `${{ env.PROJECT_NAME }}-${{ steps.tag.outputs.tag }}-win64.zip` |
+            | 🍎 macOS Apple Silicon | `${{ env.PROJECT_NAME }}-${{ steps.tag.outputs.tag }}-arm64-apple-darwin.zip` |
+
+            ### Verify Downloads
+            Check the `SHA256SUMS` file to verify the integrity of your download.
+
+            ---
+            https://www.bitcoin-pow.org
+          files: |
+            release-artifacts/*.tar.gz
+            release-artifacts/*.zip
+            release-artifacts/*.exe
+            release-artifacts/SHA256SUMS
+          draft: false
+          prerelease: false
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

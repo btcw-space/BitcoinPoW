@@ -1,4 +1,3 @@
-ACLOCAL_AMFLAGS = -I build-aux/m4
 AM_CXXFLAGS = $(WARN_CXXFLAGS) $(NOWARN_CXXFLAGS)
 
 include sources.mk

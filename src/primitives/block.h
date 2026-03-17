@@ -114,6 +114,7 @@ public:
         return ret;
     }
 
+    CBlockHeader(const CBlockHeader&) = default;
     CBlockHeader& operator=(const CBlockHeader& other)
     {
         if (this != &other)

@@ -2,11 +2,10 @@
 // Copyright (c) 2009-2018 The Bitcoin Core developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
+#ifndef _MSC_VER
 #pragma GCC optimize("O3")
 #pragma GCC optimize("unroll-loops")
-#define BOOST_VARIANT_USE_RELAXED_GET_BY_DEFAULT
-#include <boost/assign/list_of.hpp>
-
+#endif
 #include <pos.h>
 #include <txdb.h>
 #include <validation.h>
@@ -104,8 +103,6 @@ bool CheckStakeKernelHash(CBlockIndex* pindexPrev, unsigned int nBits, uint32_t 
         bnTarget = POW_POT_DIFF_HELPER*bnTarget;
         bnTarget *= 100;
     }
-
-
 
     if ( (pindexPrev->nHeight + 1) < BITCOIN_POW256_START_HEIGHT )
     {

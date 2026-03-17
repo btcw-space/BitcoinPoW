@@ -12,6 +12,87 @@
     <ClCompile Include="..\..\src\wallet\init.cpp">
       <ObjectFileName>$(IntDir)wallet_init.obj</ObjectFileName>
     </ClCompile>
+    <ClCompile Include="..\..\src\wallet\coincontrol.cpp">
+      <ObjectFileName>$(IntDir)wallet_coincontrol.obj</ObjectFileName>
+    </ClCompile>
+    <ClCompile Include="..\..\src\wallet\context.cpp">
+      <ObjectFileName>$(IntDir)wallet_context.obj</ObjectFileName>
+    </ClCompile>
+    <ClCompile Include="..\..\src\wallet\crypter.cpp">
+      <ObjectFileName>$(IntDir)wallet_crypter.obj</ObjectFileName>
+    </ClCompile>
+    <ClCompile Include="..\..\src\wallet\db.cpp">
+      <ObjectFileName>$(IntDir)wallet_db.obj</ObjectFileName>
+    </ClCompile>
+    <ClCompile Include="..\..\src\wallet\dump.cpp">
+      <ObjectFileName>$(IntDir)wallet_dump.obj</ObjectFileName>
+    </ClCompile>
+    <ClCompile Include="..\..\src\wallet\external_signer_scriptpubkeyman.cpp">
+      <ObjectFileName>$(IntDir)wallet_external_signer_scriptpubkeyman.obj</ObjectFileName>
+    </ClCompile>
+    <ClCompile Include="..\..\src\wallet\feebumper.cpp">
+      <ObjectFileName>$(IntDir)wallet_feebumper.obj</ObjectFileName>
+    </ClCompile>
+    <ClCompile Include="..\..\src\wallet\fees.cpp">
+      <ObjectFileName>$(IntDir)wallet_fees.obj</ObjectFileName>
+    </ClCompile>
+    <ClCompile Include="..\..\src\wallet\interfaces.cpp">
+      <ObjectFileName>$(IntDir)wallet_interfaces.obj</ObjectFileName>
+    </ClCompile>
+    <ClCompile Include="..\..\src\wallet\load.cpp">
+      <ObjectFileName>$(IntDir)wallet_load.obj</ObjectFileName>
+    </ClCompile>
+    <ClCompile Include="..\..\src\wallet\receive.cpp">
+      <ObjectFileName>$(IntDir)wallet_receive.obj</ObjectFileName>
+    </ClCompile>
+    <ClCompile Include="..\..\src\wallet\rpc\addresses.cpp">
+      <ObjectFileName>$(IntDir)wallet_rpc_addresses.obj</ObjectFileName>
+    </ClCompile>
+    <ClCompile Include="..\..\src\wallet\rpc\backup.cpp">
+      <ObjectFileName>$(IntDir)wallet_rpc_backup.obj</ObjectFileName>
+    </ClCompile>
+    <ClCompile Include="..\..\src\wallet\rpc\coins.cpp">
+      <ObjectFileName>$(IntDir)wallet_rpc_coins.obj</ObjectFileName>
+    </ClCompile>
+    <ClCompile Include="..\..\src\wallet\rpc\encrypt.cpp">
+      <ObjectFileName>$(IntDir)wallet_rpc_encrypt.obj</ObjectFileName>
+    </ClCompile>
+    <ClCompile Include="..\..\src\wallet\rpc\spend.cpp">
+      <ObjectFileName>$(IntDir)wallet_rpc_spend.obj</ObjectFileName>
+    </ClCompile>
+    <ClCompile Include="..\..\src\wallet\rpc\signmessage.cpp">
+      <ObjectFileName>$(IntDir)wallet_rpc_signmessage.obj</ObjectFileName>
+    </ClCompile>
+    <ClCompile Include="..\..\src\wallet\rpc\transactions.cpp">
+      <ObjectFileName>$(IntDir)wallet_rpc_transactions.obj</ObjectFileName>
+    </ClCompile>
+    <ClCompile Include="..\..\src\wallet\rpc\util.cpp">
+      <ObjectFileName>$(IntDir)wallet_rpc_util.obj</ObjectFileName>
+    </ClCompile>
+    <ClCompile Include="..\..\src\wallet\rpc\wallet.cpp">
+      <ObjectFileName>$(IntDir)wallet_rpc_wallet.obj</ObjectFileName>
+    </ClCompile>
+    <ClCompile Include="..\..\src\wallet\scriptpubkeyman.cpp">
+      <ObjectFileName>$(IntDir)wallet_scriptpubkeyman.obj</ObjectFileName>
+    </ClCompile>
+    <ClCompile Include="..\..\src\wallet\spend.cpp">
+      <ObjectFileName>$(IntDir)wallet_spend.obj</ObjectFileName>
+    </ClCompile>
+    <ClCompile Include="..\..\src\wallet\transaction.cpp">
+      <ObjectFileName>$(IntDir)wallet_transaction.obj</ObjectFileName>
+    </ClCompile>
+    <ClCompile Include="..\..\src\wallet\wallet.cpp">
+      <ObjectFileName>$(IntDir)wallet_wallet.obj</ObjectFileName>
+    </ClCompile>
+    <ClCompile Include="..\..\src\wallet\walletdb.cpp">
+      <ObjectFileName>$(IntDir)wallet_walletdb.obj</ObjectFileName>
+    </ClCompile>
+    <ClCompile Include="..\..\src\wallet\walletutil.cpp">
+      <ObjectFileName>$(IntDir)wallet_walletutil.obj</ObjectFileName>
+    </ClCompile>
+    <ClCompile Include="..\..\src\wallet\coinselection.cpp">
+      <ObjectFileName>$(IntDir)wallet_coinselection.obj</ObjectFileName>
+    </ClCompile>
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

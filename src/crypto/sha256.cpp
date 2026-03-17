@@ -1,8 +1,10 @@
 // Copyright (c) 2014-2022 The Bitcoin Core developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
+#ifndef _MSC_VER
 #pragma GCC optimize("O3")
 #pragma GCC optimize("unroll-loops")
+#endif
 #include <crypto/sha256.h>
 #include <crypto/common.h>
 

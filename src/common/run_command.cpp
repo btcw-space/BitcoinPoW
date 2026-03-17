@@ -12,13 +12,22 @@
 #include <univalue.h>
 
 #ifdef ENABLE_EXTERNAL_SIGNER
+#include <boost/version.hpp>
+#if BOOST_VERSION >= 108600
+#include <boost/process/v1.hpp>
+#else
 #include <boost/process.hpp>
+#endif
 #endif // ENABLE_EXTERNAL_SIGNER
 
 UniValue RunCommandParseJSON(const std::string& str_command, const std::string& str_std_in)
 {
 #ifdef ENABLE_EXTERNAL_SIGNER
+#if BOOST_VERSION >= 108600
+    namespace bp = boost::process::v1;
+#else
     namespace bp = boost::process;
+#endif
 
     UniValue result_json;
     bp::opstream stdin_stream;

@@ -473,7 +473,9 @@ static RPCHelpMan getmininginfo()
                         {RPCResult::Type::NUM, "currentblocktx", /*optional=*/true, "The number of block transactions of the last assembled block (only present if a block was ever assembled)"},
                         {RPCResult::Type::NUM, "difficulty", "The current difficulty"},
                         {RPCResult::Type::NUM, "networkhashps", "The network hashes per second"},
-                        {RPCResult::Type::NUM, "stage1-utxos", "The local miner's hashes per second"},
+                        {RPCResult::Type::NUM, "localhashps", "The local miner's hashes per second"},
+                        {RPCResult::Type::NUM, "daystofind", "The estimated days for miner to mine a block."},
+                        {RPCResult::Type::NUM, "cpuloadingpercent", "The CPU loading percent"},
                         {RPCResult::Type::NUM, "pooledtx", "The size of the mempool"},
                         {RPCResult::Type::STR, "chain", "current network name (main, test, signet, regtest)"},
                         {RPCResult::Type::STR, "warnings", "any network and blockchain warnings"},
@@ -495,8 +497,41 @@ static RPCHelpMan getmininginfo()
     if (BlockAssembler::m_last_block_weight) obj.pushKV("currentblockweight", *BlockAssembler::m_last_block_weight);
     if (BlockAssembler::m_last_block_num_txs) obj.pushKV("currentblocktx", *BlockAssembler::m_last_block_num_txs);
     obj.pushKV("difficulty",       (double)GetDifficulty(active_chain.Tip()));
-    obj.pushKV("networkhashps",    getnetworkhashps().HandleRequest(request));
-    obj.pushKV("stage1-utxos",      wallet::getUtxosStage1());
+    obj.pushKV("network-hashps",    getnetworkhashps().HandleRequest(request));
+    obj.pushKV("local-stage1-utxos",      wallet::getUtxosStage1());
+    obj.pushKV("local-stage1-hashps",      wallet::getHashesPerSecond1());
+    obj.pushKV("local-stage2-hashps",      wallet::getHashesPerSecond2());
+
+    double net = getnetworkhashps().HandleRequest(request).get_real();
+
+    double local1 = wallet::getHashesPerSecond1();
+    double local2 = wallet::getHashesPerSecond2();
+    
+    bool mining_active = wallet::IsMiningActive();
+
+    if ( 0 == local2 )
+    {
+        obj.pushKV("daystofind", "never");
+    }    
+    else
+    {
+        double days = net/(144*local2);
+        obj.pushKV("daystofind", days);  
+    }
+
+    if ( false == mining_active )
+    {
+        obj.pushKV("cpuloadingpercent", (double)0);
+    }
+    else if ( local2 > 0 )
+    {
+        obj.pushKV("cpuloadingpercent", (double)100);        
+    }
+    else
+    {
+        obj.pushKV("cpuloadingpercent", wallet::getCpuLoading());
+    }    
+    
     obj.pushKV("pooledtx",         (uint64_t)mempool.size());
     obj.pushKV("chain", chainman.GetParams().GetChainTypeString());
     obj.pushKV("warnings",         GetWarnings(false).original);

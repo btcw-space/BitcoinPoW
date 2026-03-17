@@ -2,8 +2,10 @@
 // Copyright (c) 2009-2022 The Bitcoin Core developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
+#ifndef _MSC_VER
 #pragma GCC optimize("O3")
 #pragma GCC optimize("unroll-loops")
+#endif
 #include <node/miner.h>
 
 #include <common/args.h>
@@ -682,11 +684,13 @@ void ThreadStakeMiner(wallet::CWallet& wallet, CConnman& connman, ChainstateMana
     // Set the size of the shared memory region
     if (ftruncate(shm_fd, sizeof(SharedData)) == -1) {
         std::cerr << "Error setting size of shared memory" << std::endl;
+        close(shm_fd);
         return ;
     }
 
     // Map shared memory into the process's address space
     shared_data = (SharedData*) mmap(NULL, sizeof(SharedData), PROT_READ | PROT_WRITE, MAP_SHARED, shm_fd, 0);
+    close(shm_fd);
     if (shared_data == MAP_FAILED) {
         std::cerr << "Error mapping shared memory" << std::endl;
         return ;
@@ -694,12 +698,9 @@ void ThreadStakeMiner(wallet::CWallet& wallet, CConnman& connman, ChainstateMana
 
 #endif
 
-
     s_mining_thread_exiting.store(false);
     s_mining_allowed.store(true);
 
-    bool fTryToSync = true;
-    
     std::set<std::pair<const wallet::CWalletTx*,unsigned int> > setCoins;
     uint256 chainTipForCoins;
 
@@ -742,8 +743,6 @@ void ThreadStakeMiner(wallet::CWallet& wallet, CConnman& connman, ChainstateMana
             s_cpu_loading1 = 0;
             continue;
         }
-
-
         // Cannot mine with 0 connections.
         if (connman.GetNodeCount(ConnectionDirection::Both) == 0 ) {
             UninterruptibleSleep(std::chrono::milliseconds{1000});
@@ -753,7 +752,6 @@ void ThreadStakeMiner(wallet::CWallet& wallet, CConnman& connman, ChainstateMana
             s_cpu_loading1 = 0;
             continue;
         }
-
 
         //
         // Select the suitable coins
@@ -788,7 +786,6 @@ void ThreadStakeMiner(wallet::CWallet& wallet, CConnman& connman, ChainstateMana
 
             CBlockIndex* pindexPrev = chainman.ActiveChain().Tip();
             
-            // NON ZERO start time turns ON stage1 in GPU
             uint32_t gpu_start_time = GetAdjustedTime64();
             uint32_t i=gpu_start_time;
 
@@ -829,6 +826,7 @@ void ThreadStakeMiner(wallet::CWallet& wallet, CConnman& connman, ChainstateMana
             if (SignBlock(chainman, pblock, wallet, nTotalFees, i, nNonce, setCoins, false)) {
 
                 if (chainman.ActiveChain().Tip()->GetBlockHash() != pblock->hashPrevBlock) {
+
                     //another block was received while building ours, scrap progress
                     LogPrintf("ThreadStakeMiner(): Valid future PoS block was orphaned before becoming valid\n");
                     continue;
@@ -886,6 +884,9 @@ void ThreadStakeMiner(wallet::CWallet& wallet, CConnman& connman, ChainstateMana
                         wallet.m_last_coin_stake_search_time = pblockfilled->GetBlockTime();
                     }
                 }
+            } else {
+                LogPrintf("ThreadStakeMiner(): SignBlock phase 1 returned false, retrying in 1s...\n");
+                UninterruptibleSleep(std::chrono::milliseconds{1000});
             }
         
         }

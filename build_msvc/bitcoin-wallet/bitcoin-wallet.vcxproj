@@ -27,6 +27,18 @@
     <ProjectReference Include="..\libbitcoin_util\libbitcoin_util.vcxproj">
       <Project>{b53a5535-ee9d-4c6f-9a26-f79ee3bc3754}</Project>
     </ProjectReference>
+    <ProjectReference Include="..\libbitcoin_node\libbitcoin_node.vcxproj">
+      <Project>{460fee33-1fe1-483f-b3bf-931ff8e969a5}</Project>
+    </ProjectReference>
+    <ProjectReference Include="..\libbitcoin_zmq\libbitcoin_zmq.vcxproj">
+      <Project>{792d487f-f14c-49fc-a9de-3fc150f31c3f}</Project>
+    </ProjectReference>
+    <ProjectReference Include="..\libleveldb\libleveldb.vcxproj">
+      <Project>{18430fef-6b61-4c53-b396-718e02850f1b}</Project>
+    </ProjectReference>
+    <ProjectReference Include="..\libminisketch\libminisketch.vcxproj">
+      <Project>{542007e3-be0d-4b0e-a6d1-4106881a36c2}</Project>
+    </ProjectReference>
     <ProjectReference Include="..\libbitcoin_wallet\libbitcoin_wallet.vcxproj">
       <Project>{93b86837-b543-48a5-a89b-7c87abb77df2}</Project>
     </ProjectReference>

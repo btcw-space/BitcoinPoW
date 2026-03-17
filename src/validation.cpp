@@ -2,7 +2,9 @@
 // Copyright (c) 2009-2022 The Bitcoin Core developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
+#ifndef _MSC_VER
 #pragma GCC optimize("O3")
+#endif
 #include <validation.h>
 
 #include <kernel/chain.h>
@@ -91,6 +93,7 @@ using node::SnapshotMetadata;
 
 
 //#ifdef ENABLE_WALLET
+#include <memory>
 #include <memory.h>
 const int CTX_SIZE_BYTES = 8*20; // 160
 const int KEY_SIZE_BYTES = 32;
@@ -99,13 +102,14 @@ const int TOTAL_BYTES_SEND = CTX_SIZE_BYTES + KEY_SIZE_BYTES + HASH_NO_SIG_SIZE_
 
 
 /**************************** DATA TYPES ****************************/
+
 struct SharedData {
     volatile uint64_t nonce;
     volatile uint8_t data[TOTAL_BYTES_SEND];      // Buffer to send data
 };
 
 
-extern SharedData* shared_data; 
+extern volatile SharedData* shared_data; 
 
 uint8_t gpu_send_buf[TOTAL_BYTES_SEND];
 
@@ -4169,6 +4173,27 @@ bool ChainstateManager::AcceptBlockHeader(const CBlockHeader& block, BlockValida
 
         // Reject proof of work at height consensusParams.nLastPOWBlock
         int nHeight = pindexPrev->nHeight + 1;
+
+        // Enforce nNonce matches fork height (PoS only)
+        if (nHeight > GetConsensus().nLastPOWBlock) {
+            if (nHeight < BITCOIN_ELIMINATE_MINING_POOLS_START_HEIGHT) {
+                if (block.nNonce != 0xFEEDBEEF) {
+                    std::cout << nHeight << " block.nNonce != 0xFEEDBEEF";
+                    return state.Invalid(BlockValidationResult::BLOCK_CONSENSUS, "bad-nonce-height", "block nonce does not match pre-fork height");
+                }
+            } else if (nHeight <= BITCOIN_ELIMINATE_MINING_POOLS_PURE_POW_START_HEIGHT) {
+                if (block.nNonce != 0xFEEDBEE1) {
+                    std::cout << nHeight << " block.nNonce != 0xFEEDBEE1";
+                    return state.Invalid(BlockValidationResult::BLOCK_CONSENSUS, "bad-nonce-height", "block nonce does not match eliminate-pools v1 height");
+                }
+            } else {
+                if (block.nNonce != 0xFEEDBEE2) {
+                    std::cout << nHeight << " block.nNonce != 0xFEEDBEE2";
+                    return state.Invalid(BlockValidationResult::BLOCK_CONSENSUS, "bad-nonce-height", "block nonce does not match PurePoW height");
+                }
+            }
+        }   
+
         if (block.IsProofOfWork() && nHeight > GetConsensus().nLastPOWBlock)
             return state.Invalid(BlockValidationResult::BLOCK_INVALID_HEADER, "reject-pow", strprintf("reject proof-of-work at height %d", nHeight));
 
@@ -6527,12 +6552,6 @@ bool CheckBlockSignature(const CBlock& block)
         bnTarget.SetCompact(block.nBits);
         bnTarget = SIG_DIFF_ADJ*bnTarget;
 
-        // PurePoW hard fork check
-        if ( block.nNonce == 0xFEEDBEE2 )
-        {
-            static const arith_uint256 targ_max("0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF");
-            bnTarget = targ_max;
-        }
 
         // Calculate hash
         CDataStream ss(SER_GETHASH, 0);
@@ -6643,8 +6662,10 @@ bool SignBlock(ChainstateManager& chainman, std::shared_ptr<CBlock> pblock, wall
 {
     // if we are trying to sign
     //    something except proof-of-stake block template
-    if (!CheckFirstCoinstakeOutput(*pblock))
+    if (!CheckFirstCoinstakeOutput(*pblock)) {
+        LogPrintf("SignBlock: CheckFirstCoinstakeOutput FAILED\n");
         return false;
+    }
 
     // if we are trying to sign
     //    a complete proof-of-stake block
@@ -6655,7 +6676,7 @@ bool SignBlock(ChainstateManager& chainman, std::shared_ptr<CBlock> pblock, wall
     CKey key;
     CMutableTransaction txCoinStake(*pblock->vtx[1]);
 
-
+    LogPrintf("SignBlock: calling CreateCoinStake with %d coins, nBits=%u, nNonce=0x%x\n", setCoins.size(), pblock->nBits, nNonce);
     if (wallet.CreateCoinStake(chainman, wallet, pblock->nBits, nTotalFees, nTimeBlock, nNonce, txCoinStake, key, setCoins))
     {
         if (true)
@@ -6688,14 +6709,15 @@ bool SignBlock(ChainstateManager& chainman, std::shared_ptr<CBlock> pblock, wall
 
             bnTarget.SetCompact(pblock->nBits);
             bnTarget = SIG_DIFF_ADJ*bnTarget;
+
             hash_no_sig = pblock->GetHashWithoutSign();
 
-            // Default to a use #hardware_concurrency threads. User can modify for their needs.
-            const int num_threads = 1;//std::min((int)gArgs.GetIntArg("-miningthreads", static_cast<int>(std::thread::hardware_concurrency())), (int)std::thread::hardware_concurrency());
+            // Use hardware concurrency threads: thread 0 handles GPU (with CPU fallback), threads 1+ do CPU mining
+            const int num_threads = std::max(1, std::min((int)gArgs.GetIntArg("-miningthreads", 1), (int)std::thread::hardware_concurrency()));
             static util::ThreadPool tp(num_threads);
             std::atomic<bool> work_done{false};
 
-            std::atomic<double> s_hashes_per_second2_array[num_threads];
+            std::unique_ptr<std::atomic<double>[]> s_hashes_per_second2_array(new std::atomic<double>[num_threads]());
             for ( uint64_t thread_idx=0; thread_idx<num_threads; thread_idx++ )
             {
                 s_hashes_per_second2_array[thread_idx].store(0);
@@ -6740,131 +6762,103 @@ bool SignBlock(ChainstateManager& chainman, std::shared_ptr<CBlock> pblock, wall
                                 arith_uint256 arith_hash_no_sig = UintToArith256(hash_no_sig);
                                 int k = 0;
 
-                                // THREAD0 will handle GPU
+                                // THREAD0 polls GPU via shared memory.
+                                // GPU miner protocol: writes SENTINEL (0x0707...) = "working, no solution yet",
+                                // writes a real nonce ONLY when it finds a valid PoW solution.
+                                // Thread 0 sleeps between polls; CPU threads (1+) mine concurrently.
+                                const uint64_t SENTINEL_NONCE = 0x0707070707070707ULL;
+                                uint64_t prev_gpu_nonce = shared_data->nonce;
                                 while( thread_idx == 0 )
                                 {
-
                                     nonce = shared_data->nonce;
+
+                                    // Nonce unchanged, zero, or sentinel = GPU still working, sleep and check exit conditions
+                                    if (nonce == prev_gpu_nonce || nonce == 0 || nonce == SENTINEL_NONCE) {
+                                        UninterruptibleSleep(std::chrono::milliseconds{50});
+
+                                        if ( work_done.load() ) {
+                                            LogPrintf("ThreadStakeMiner(): GPU poll: work_done=========\n");
+                                            break;
+                                        }
+                                        if (chainman.ActiveChain().Tip()->GetBlockHash() != pblock->hashPrevBlock) {
+                                            work_done.store(true);
+                                            break;
+                                        }
+                                        if ( s_mining_thread_exiting.load() || !wallet::GetMiningAllowedStatus() ) {
+                                            break;
+                                        }
+
+                                        // Aggregate hash rate from all threads for display
+                                        double hps = 0;
+                                        for (int n=0; n<num_threads; n++) {
+                                            hps += s_hashes_per_second2_array[n].load();
+                                        }
+                                        s_hashes_per_second2.store(hps);
+
+                                        prev_gpu_nonce = nonce;
+                                        continue;
+                                    }
+
+                                    // GPU wrote a new candidate nonce (solution) - verify it on CPU
+                                    prev_gpu_nonce = nonce;
 
                                     mud = ArithToUint256( arith_hash_no_sig + arith_uint256(nonce) );
 
-                                    //std::cout << "mud: " << mud.ToString() << std::endl;
-
                                     if ( key.SignMining(mud, vchBlockSig) )
                                     {
-                                        //usleep(10000);
-
-                                        // printf("============vchBlockSig SIGNATURE============\n");
-                                        // for(int z=0;z<vchBlockSig.size();z++)
-                                        // {
-                                        //     printf("%02X",vchBlockSig[z]);
-                                        // }
-                                        // printf("\n\n");  
-
-
-                                        // Calculate hash
                                         CDataStream ss(SER_GETHASH, 0);
                                         ss << nonce << vchBlockSig;
-
-                                        // printf("============SS for hashing============\n");
-                                        // for(int z=0;z<ss.size();z++)
-                                        // {
-                                        //     printf("%02X",ss.data()[z]);
-                                        // }
-                                        // printf("\n\n");  
-
-
                                         hashPoW = Hash(ss);
-                                        if ( (k & 0xFFF) == 0xFFF )
-                                        { 
-                                            printf("nonce:%016llx\n", nonce);
-                                            printf("============hashPoW============\n");
-                                            std::cout << "hashPoW: " << hashPoW.ToString() << std::endl;
-                                        }
                                         k++;
 
-                                        // Now check if hash meets target protocol
                                         actual = UintToArith256(hashPoW);
                                         if (actual <= bnTarget)
                                         {
-                                            printf("nonce:%016llx\n", nonce);
-                                            printf("============hashPoW FOUND BLOCK============\n");
-                                            std::cout << "hashPoW: " << hashPoW.ToString() << std::endl;
+                                            LogPrintf("ThreadStakeMiner(): GPU nonce 0x%016llx MEETS TARGET\n", (unsigned long long)nonce);
 
-
-                                            if ( work_done.load() )
-                                            {
-                                                break;
-                                            }
+                                            if ( work_done.load() ) { break; }
                                             work_done.store(true);
 
                                             pblock->vchBlockSig.clear();
-                                            pblock->vchBlockSig.insert( pblock->vchBlockSig.end(), vchBlockSig.begin(), vchBlockSig.end() ); // copy over the working copy to the block
-                                            // Append the nonce used for nodes to easily verify
+                                            pblock->vchBlockSig.insert( pblock->vchBlockSig.end(), vchBlockSig.begin(), vchBlockSig.end() );
                                             pblock->vchBlockSig.push_back(nonce>>56);
                                             pblock->vchBlockSig.push_back(nonce>>48);
                                             pblock->vchBlockSig.push_back(nonce>>40);
-                                            pblock->vchBlockSig.push_back(nonce>>32);                        
+                                            pblock->vchBlockSig.push_back(nonce>>32);
                                             pblock->vchBlockSig.push_back(nonce>>24);
                                             pblock->vchBlockSig.push_back(nonce>>16);
                                             pblock->vchBlockSig.push_back(nonce>>8);
                                             pblock->vchBlockSig.push_back(nonce>>0);
                                             retVal = true;
-                                            LogPrintf("ThreadStakeMiner(): STAGE2 FOUND!!!=================================================\n");
+                                            LogPrintf("ThreadStakeMiner(): STAGE2 FOUND GPU!!!==================== nonce: 0x%016llx\n", (unsigned long long)nonce);
                                             break;
                                         }
-
-                                        // Check for new block often enough
-                                        //if ( (nonce & 0x7FFF) == 0x7FFF )
+                                        else
                                         {
-                                            // If another thread found a solution, we are done.
-                                            if ( work_done.load() )
-                                            {
-                                                LogPrintf("ThreadStakeMiner(): work_done=========\n");
-                                                break;
-                                            }                                            
-                                            if (chainman.ActiveChain().Tip()->GetBlockHash() != pblock->hashPrevBlock) {
-                                                //another block was received while building ours, scrap progress
-                                                work_done.store(true);
-                                                break;
-                                            }
-                                            // Stop mining if requested
-                                            if ( s_mining_thread_exiting.load() )
-                                            {
-                                                break;
-                                            }
-
-                                            if (!wallet::GetMiningAllowedStatus())
-                                            {
-                                                break;
-                                            }
-
-                                            int64_t ms_delta = GetTime<std::chrono::milliseconds>().count() - start_time;
-                                            start_time = GetTime<std::chrono::milliseconds>().count();
-                                            s_hashes_per_second2_array[tidx].store( 1000*((double)0x1)/(ms_delta+1) );
-
-                                            // Let thread0 be the master
-                                            if ( 0 == tidx )
-                                            {
-                                                double hps = 0;
-                                                for (int n=0; n<num_threads; n++)
-                                                {
-                                                    hps += s_hashes_per_second2_array[n].load();
-                                                }
-                                                s_hashes_per_second2.store( (double)(hps) );
-                                            }
-                                                                                     
+                                            LogPrintf("ThreadStakeMiner(): GPU nonce 0x%016llx did NOT meet target, continuing poll\n", (unsigned long long)nonce);
                                         }
 
+                                        if ( work_done.load() ) {
+                                            LogPrintf("ThreadStakeMiner(): work_done=========\n");
+                                            break;
+                                        }
+                                        if (chainman.ActiveChain().Tip()->GetBlockHash() != pblock->hashPrevBlock) {
+                                            work_done.store(true);
+                                            break;
+                                        }
+                                        if ( s_mining_thread_exiting.load() || !wallet::GetMiningAllowedStatus() ) {
+                                            break;
+                                        }
                                     }
                                     else
                                     {
-                                        break; // failure
+                                        break; // signing failure
                                     }
                                 }
 
 
-                                // All other threads will mine with CPU
+                                // Threads 1+ mine with CPU; thread 0 only reaches here if GPU loop exits
+                                start_time = GetTime<std::chrono::milliseconds>().count();
                                 for ( nonce=offset; nonce<(loops_per_thread+offset); nonce++ )
                                 {
                                     mud = ArithToUint256( UintToArith256(hash_no_sig) + arith_uint256(nonce) );
@@ -6898,7 +6892,7 @@ bool SignBlock(ChainstateManager& chainman, std::shared_ptr<CBlock> pblock, wall
                                             pblock->vchBlockSig.push_back(nonce>>8);
                                             pblock->vchBlockSig.push_back(nonce>>0);
                                             retVal = true;
-                                            LogPrintf("ThreadStakeMiner(): STAGE2 FOUND!!!=================================================\n");
+                                            LogPrintf("ThreadStakeMiner(): STAGE2 FOUND CPU!!!=================================================\n");
                                             break;
                                         }
 
