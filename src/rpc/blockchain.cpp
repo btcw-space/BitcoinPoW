@@ -165,6 +165,20 @@ UniValue blockheaderToJSON(const CBlockIndex& tip, const CBlockIndex& blockindex
 
     UniValue result(UniValue::VOBJ);
     result.pushKV("hash", blockindex.GetBlockHash().GetHex());
+    uint256 powhash;
+    if (blockindex.IsProofOfWork()) {
+        powhash = blockindex.GetBlockHash();
+    } else if (blockindex.nHeight >= NO_EXT_WORK_ACTIVATION_HEIGHT) {
+        powhash = Hash(blockindex.vchBlockSig);
+    } else if (blockindex.vchBlockSig.size() >= 8) {
+        // Legacy signatures end with an eight-byte, big-endian nonce.
+        const auto nonce_begin = blockindex.vchBlockSig.end() - 8;
+        uint64_t nonce{0};
+        for (auto it = nonce_begin; it != blockindex.vchBlockSig.end(); ++it) nonce = (nonce << 8) | *it;
+        const std::vector<unsigned char> signature(blockindex.vchBlockSig.begin(), nonce_begin);
+        powhash = (HashWriter{} << nonce << signature).GetHash();
+    }
+    result.pushKV("powhash", powhash.GetHex());
     const CBlockIndex* pnext;
     int confirmations = ComputeNextBlockAndDepth(tip, blockindex, pnext);
     result.pushKV("confirmations", confirmations);
@@ -618,6 +632,7 @@ static RPCHelpMan getblockheader()
                         RPCResult::Type::OBJ, "", "",
                         {
                             {RPCResult::Type::STR_HEX, "hash", "the block hash (same as provided)"},
+                            {RPCResult::Type::STR_HEX, "powhash", "The work hash: block hash for proof-of-work blocks; otherwise the serialized legacy nonce and signature hash before the fork, or Hash(vchBlockSig) from the fork onward"},
                             {RPCResult::Type::NUM, "confirmations", "The number of confirmations, or -1 if the block is not on the main chain"},
                             {RPCResult::Type::NUM, "height", "The block height or index"},
                             {RPCResult::Type::NUM, "version", "The block version"},
@@ -785,6 +800,7 @@ static RPCHelpMan getblock()
                 RPCResult::Type::OBJ, "", "",
                 {
                     {RPCResult::Type::STR_HEX, "hash", "the block hash (same as provided)"},
+                    {RPCResult::Type::STR_HEX, "powhash", "The work hash: block hash for proof-of-work blocks; otherwise the serialized legacy nonce and signature hash before the fork, or Hash(vchBlockSig) from the fork onward"},
                     {RPCResult::Type::NUM, "confirmations", "The number of confirmations, or -1 if the block is not on the main chain"},
                     {RPCResult::Type::NUM, "size", "The block size"},
                     {RPCResult::Type::NUM, "strippedsize", "The block size excluding witness data"},
